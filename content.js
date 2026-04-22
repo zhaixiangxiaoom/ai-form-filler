@@ -178,7 +178,8 @@ function detectRichTextEditors(container) {
     '.note-editable',
     '[data-editor]',
     '.rich-text-editor',
-    '.wysiwyg-editor'
+    '.wysiwyg-editor',
+    '.public-DraftEditor-content'  // Draft.js
   ];
   
   editorSelectors.forEach(selector => {
@@ -340,6 +341,7 @@ function detectEditorType(element) {
   if (className.includes('ql-editor') || className.includes('quill')) return 'quill';
   if (className.includes('fr-element') || className.includes('froala')) return 'froala';
   if (className.includes('note-editable') || className.includes('summernote')) return 'summernote';
+  if (className.includes('public-drafteditor-content') || className.includes('draft-js')) return 'draftjs';
   
   return 'unknown';
 }
@@ -611,6 +613,50 @@ function fillRichTextField(field, value) {
       if (element && window.jQuery(element).summernote) {
         window.jQuery(element).summernote('code', value);
         console.log('Filled Summernote editor:', field.name);
+        return true;
+      }
+    }
+    
+    // Draft.js
+    if (editorType === 'draftjs') {
+      // Draft.js uses contenteditable div with specific structure
+      const element = document.getElementById(field.id) || 
+                      document.querySelector(`[data-editor="${field.id}"]`) ||
+                      document.querySelector('.public-DraftEditor-content');
+      
+      if (element) {
+        // For Draft.js, we need to simulate user input
+        // Clear existing content
+        element.innerHTML = '';
+        
+        // Create Draft.js compatible structure
+        const dataBlock = document.createElement('div');
+        dataBlock.setAttribute('data-contents', 'true');
+        
+        const innerDiv = document.createElement('div');
+        innerDiv.className = '';
+        innerDiv.setAttribute('data-block', 'true');
+        innerDiv.setAttribute('data-editor', element.getAttribute('data-editor') || '');
+        innerDiv.setAttribute('data-offset-key', '0-0-0');
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.setAttribute('data-offset-key', '0-0-0');
+        contentDiv.className = 'public-DraftStyleDefault-block public-DraftStyleDefault-ltr';
+        
+        const span = document.createElement('span');
+        span.setAttribute('data-offset-key', '0-0-0');
+        span.textContent = value;
+        
+        contentDiv.appendChild(span);
+        innerDiv.appendChild(contentDiv);
+        dataBlock.appendChild(innerDiv);
+        element.appendChild(dataBlock);
+        
+        // Trigger events
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+        
+        console.log('Filled Draft.js editor:', field.name);
         return true;
       }
     }
