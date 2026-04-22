@@ -18,7 +18,7 @@ A powerful Chrome browser extension that automatically detects form fields on we
 
 **Option 1: Clone from GitHub**
 ```bash
-git clone https://github.com/your-username/ai-form-filler.git
+git clone https://github.com/zhaixiangxiaoom/ai-form-filler.git
 cd ai-form-filler
 ```
 
