@@ -16,10 +16,16 @@ A powerful Chrome browser extension that automatically detects form fields on we
 
 ### Step 1: Download/Clone the Extension
 
-The extension files are already in your workspace at:
+**Option 1: Clone from GitHub**
+```bash
+git clone https://github.com/your-username/ai-form-filler.git
+cd ai-form-filler
 ```
-/Users/zhaixiangxiao/IdeaProjects/ai-form-filler
-```
+
+**Option 2: Download ZIP**
+- Go to the GitHub repository
+- Click **Code** → **Download ZIP**
+- Extract the ZIP file
 
 ### Step 2: Add Icon Files (Optional but Recommended)
 
