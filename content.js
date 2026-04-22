@@ -421,54 +421,121 @@ function getPageContext() {
 
 // Fill form fields with generated data
 function fillFormFields(formData) {
-  console.log('[AI Form Filler] Starting to fill fields:', formData);
-  console.log('[AI Form Filler] Total fields to fill:', Object.keys(formData).length);
+  console.log('[AI Form Filler] Starting to fill fields:', Object.keys(formData).length, 'fields');
   
   isProcessing = true;
   let filledCount = 0;
   
+  // Get all form fields on the page with their detection indices
+  const allFields = getAllFieldsWithIndices();
+  
   Object.keys(formData).forEach(fieldName => {
     const value = formData[fieldName];
-    console.log(`[AI Form Filler] Processing field: ${fieldName}`, 'Type:', typeof value, 'Value preview:', String(value).substring(0, 100));
+    console.log(`[AI Form Filler] Processing: ${fieldName} (${typeof value})`);
     
-    // First try to find by name/id
-    const fields = findFieldsByName(fieldName);
-    console.log(`[AI Form Filler] Found ${fields.length} elements for field: ${fieldName}`);
+    // Strategy 1: Try to find by exact name/id match
+    let fields = findFieldsByName(fieldName);
     
+    // Strategy 2: If not found, try to match by detection index
+    if (fields.length === 0) {
+      const indexMatch = fieldName.match(/^(\w+)_(\d+)$/);
+      if (indexMatch) {
+        const [, tagName, index] = indexMatch;
+        console.log(`[AI Form Filler] Trying index-based match: ${tagName}[${index}]`);
+        fields = findFieldByTagAndIndex(tagName, parseInt(index), allFields);
+      }
+    }
+    
+    // Strategy 3: Try placeholder/label match
+    if (fields.length === 0) {
+      console.log(`[AI Form Filler] Trying placeholder/label match for: ${fieldName}`);
+      const matched = findFieldByLabelOrPlaceholder(fieldName, value);
+      if (matched) fields = [matched];
+    }
+    
+    // Fill the found field(s)
     if (fields.length > 0) {
       fields.forEach(field => {
-        console.log(`[AI Form Filler] Attempting to fill element:`, field.tagName, field.type || '', field.name || field.id || '');
         if (fillField(field, value)) {
           filledCount++;
-          console.log(`[AI Form Filler] ✅ Successfully filled: ${fieldName}`);
-        } else {
-          console.log(`[AI Form Filler] ❌ Failed to fill: ${fieldName}`);
+          console.log(`[AI Form Filler] ✅ Filled: ${fieldName}`);
         }
       });
     } else {
-      // If not found by name, try to match by label or placeholder
-      console.log(`[AI Form Filler] No elements found by name, trying label/placeholder match for: ${fieldName}`);
-      const matchedField = findFieldByLabelOrPlaceholder(fieldName, value);
-      if (matchedField) {
-        console.log(`[AI Form Filler] Found matching field by label/placeholder:`, matchedField.tagName, matchedField.name || matchedField.id || '');
-        if (fillField(matchedField, value)) {
-          filledCount++;
-          console.log(`[AI Form Filler] ✅ Successfully filled via label/placeholder: ${fieldName}`);
-        }
-      } else {
-        console.log(`[AI Form Filler] ❌ Could not find any matching field for: ${fieldName}`);
-      }
+      console.log(`[AI Form Filler] ❌ Not found: ${fieldName}`);
     }
   });
   
-  // Dispatch events to trigger any listeners
   dispatchFormEvents();
-  
-  console.log(`[AI Form Filler] Completed! Successfully filled ${filledCount} fields`);
+  console.log(`[AI Form Filler] Completed! Filled ${filledCount}/${Object.keys(formData).length} fields`);
   isProcessing = false;
   
-  // Show notification
   showNotification(`Successfully filled ${filledCount} fields!`, 'success');
+}
+
+// Get all form fields with their detection indices
+function getAllFieldsWithIndices() {
+  const fields = [];
+  let index = 0;
+  
+  // Get standard form fields
+  const standardFields = document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]), select, textarea');
+  standardFields.forEach(field => {
+    if (!shouldSkipField(field)) {
+      fields.push({
+        element: field,
+        tagName: field.tagName.toLowerCase(),
+        type: field.type || field.tagName.toLowerCase(),
+        index: index++,
+        name: field.name || '',
+        id: field.id || '',
+        placeholder: field.placeholder || ''
+      });
+    }
+  });
+  
+  // Get rich text editors
+  const richtextSelectors = [
+    '[contenteditable="true"]',
+    '.ql-editor',
+    '.tinymce',
+    '.ck-content',
+    '.public-DraftEditor-content'
+  ];
+  
+  richtextSelectors.forEach(selector => {
+    try {
+      document.querySelectorAll(selector).forEach(element => {
+        fields.push({
+          element: element,
+          tagName: element.tagName.toLowerCase(),
+          type: 'richtext',
+          index: index++,
+          name: element.id || '',
+          id: element.id || '',
+          placeholder: element.getAttribute('placeholder') || ''
+        });
+      });
+    } catch (e) {}
+  });
+  
+  return fields;
+}
+
+// Find field by tag name and detection index
+function findFieldByTagAndIndex(tagName, targetIndex, allFields) {
+  // Filter fields by tag name
+  const matchingFields = allFields.filter(f => 
+    f.tagName === tagName.toLowerCase() || 
+    f.type === tagName.toLowerCase()
+  );
+  
+  // Find by relative position
+  if (matchingFields.length > 0 && targetIndex < matchingFields.length) {
+    return [matchingFields[targetIndex].element];
+  }
+  
+  return [];
 }
 
 // Find fields by name, id, or other attributes
