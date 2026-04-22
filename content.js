@@ -791,13 +791,3 @@ setTimeout(() => {
     console.log(`AI Form Filler: Detected ${forms.length} form(s) on page`);
   }
 }, 1000);
-`;
-document.head.appendChild(style);
-
-// Auto-detect forms on page load
-setTimeout(() => {
-  const forms = detectAllForms();
-  if (forms.length > 0) {
-    console.log(`AI Form Filler: Detected ${forms.length} form(s) on page`);
-  }
-}, 1000);
