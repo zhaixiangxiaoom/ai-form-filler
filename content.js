@@ -442,7 +442,21 @@ function fillFormFields(formData) {
       if (indexMatch) {
         const [, tagName, index] = indexMatch;
         console.log(`[AI Form Filler] Trying index-based match: ${tagName}[${index}]`);
-        fields = findFieldByTagAndIndex(tagName, parseInt(index), allFields);
+        const matchedFieldObj = findFieldByTagAndIndex(tagName, parseInt(index), allFields);
+        if (matchedFieldObj) {
+          // Use the actual element from the field object
+          fields = [matchedFieldObj.element];
+          // Copy editorType and other metadata to the element
+          if (matchedFieldObj.editorType) {
+            fields[0].editorType = matchedFieldObj.editorType;
+          }
+          if (matchedFieldObj.type) {
+            fields[0].type = matchedFieldObj.type;
+          }
+          if (matchedFieldObj.className) {
+            fields[0].className = matchedFieldObj.className;
+          }
+        }
       }
     }
     
@@ -497,7 +511,7 @@ function getAllFieldsWithIndices() {
   // Get rich text editors
   const richtextSelectors = [
     '[contenteditable="true"]',
-    '.ql-editor',
+    '.ql-container',
     '.tinymce',
     '.ck-content',
     '.public-DraftEditor-content'
@@ -506,14 +520,29 @@ function getAllFieldsWithIndices() {
   richtextSelectors.forEach(selector => {
     try {
       document.querySelectorAll(selector).forEach(element => {
+        const editorType = detectEditorType(element);
+        
+        // For Quill, verify we can find the instance
+        if (editorType === 'quill') {
+          const hasQuill = !!element.querySelector('.ql-editor') || 
+                          element.classList.contains('ql-container');
+          if (!hasQuill) {
+            console.log('[Detection] Skipping non-Quill element:', element.className);
+            return;
+          }
+          console.log('[Detection] Found Quill container:', element.id || 'no-id');
+        }
+        
         fields.push({
           element: element,
           tagName: element.tagName.toLowerCase(),
-          type: 'richtext',
+          type: 'richtext-' + editorType,
           index: index++,
           name: element.id || '',
           id: element.id || '',
-          placeholder: element.getAttribute('placeholder') || ''
+          placeholder: element.getAttribute('placeholder') || '',
+          editorType: editorType,
+          className: element.className || ''
         });
       });
     } catch (e) {}
@@ -524,18 +553,33 @@ function getAllFieldsWithIndices() {
 
 // Find field by tag name and detection index
 function findFieldByTagAndIndex(tagName, targetIndex, allFields) {
-  // Filter fields by tag name
-  const matchingFields = allFields.filter(f => 
-    f.tagName === tagName.toLowerCase() || 
-    f.type === tagName.toLowerCase()
-  );
+  console.log(`[Index Match] Looking for ${tagName}[${targetIndex}]`);
+  console.log(`[Index Match] Total fields:`, allFields.length);
   
-  // Find by relative position
+  // Filter fields by tag name or type prefix
+  const matchingFields = allFields.filter(f => {
+    // Match by tag name (e.g., 'div', 'input')
+    const byTagName = f.tagName === tagName.toLowerCase();
+    // Match by type prefix (e.g., 'richtext' matches 'richtext-quill')
+    const byType = f.type && f.type.toLowerCase().startsWith(tagName.toLowerCase());
+    const match = byTagName || byType;
+    
+    if (match) {
+      console.log(`[Index Match] Found:`, f.tagName, 'type:', f.type, 'index:', f.index);
+    }
+    return match;
+  });
+  
+  console.log(`[Index Match] Matches:`, matchingFields.length);
+  
+  // Return full field object (not just element)
   if (matchingFields.length > 0 && targetIndex < matchingFields.length) {
-    return [matchingFields[targetIndex].element];
+    console.log(`[Index Match] ✅ Returning field at index ${targetIndex}`);
+    return matchingFields[targetIndex];
   }
   
-  return [];
+  console.log(`[Index Match] ❌ Index out of range`);
+  return null;
 }
 
 // Find fields by name, id, or other attributes
@@ -639,175 +683,64 @@ function fillField(field, value) {
   }
 }
 
-// Fill rich text editor field
+// Fill rich text editor field - Simplified approach
 function fillRichTextField(field, value) {
   try {
-    const editorType = field.editorType || detectEditorTypeByName(field.name);
+    console.log('[RichText Fill] Filling:', field.tagName, field.className?.substring(0, 50));
     
-    // TinyMCE
-    if (editorType === 'tinymce' && window.tinymce) {
-      const editor = window.tinymce.get(field.name || field.id);
-      if (editor) {
-        editor.setContent(value);
-        editor.save();
-        console.log('Filled TinyMCE editor:', field.name);
-        return true;
-      }
-    }
-    
-    // CKEditor
-    if (editorType === 'ckeditor' && window.CKEDITOR) {
-      const editor = window.CKEDITOR.instances[field.name || field.id];
-      if (editor) {
-        editor.setData(value);
-        console.log('Filled CKEditor:', field.name);
-        return true;
-      }
-    }
-    
-    // Quill
-    if (editorType === 'quill') {
-      // Try multiple strategies to find Quill
-      let quill = null;
-      
-      // Strategy 1: Find by ID
-      if (field.id) {
-        const el = document.getElementById(field.id);
-        quill = el?.__quill || el?.querySelector('.ql-container')?.__quill;
-      }
-      
-      // Strategy 2: Find any Quill instance on page
-      if (!quill) {
-        const allQuillContainers = document.querySelectorAll('.ql-container');
-        for (const container of allQuillContainers) {
-          if (container.__quill) {
-            quill = container.__quill;
-            break;
-          }
-        }
-      }
-      
-      if (quill) {
-        quill.clipboard.dangerouslyPasteHTML(value);
-        console.log('Filled Quill editor:', field.name);
-        return true;
-      }
-    }
-    
-    // Froala
-    if (editorType === 'froala' && window.FroalaEditor) {
-      const element = document.getElementById(field.name || field.id);
-      if (element && element.froalaEditor) {
-        element.froalaEditor('html.set', value);
-        console.log('Filled Froala editor:', field.name);
-        return true;
-      }
-    }
-    
-    // Summernote
-    if (editorType === 'summernote' && window.jQuery) {
-      const element = document.getElementById(field.name || field.id);
-      if (element && window.jQuery(element).summernote) {
-        window.jQuery(element).summernote('code', value);
-        console.log('Filled Summernote editor:', field.name);
-        return true;
-      }
-    }
-    
-    // Draft.js
-    if (editorType === 'draftjs') {
-      // Draft.js uses contenteditable div with specific structure
-      const element = document.getElementById(field.id) || 
-                      document.querySelector(`[data-editor="${field.id}"]`) ||
-                      document.querySelector('.public-DraftEditor-content');
-      
-      if (element) {
-        // For Draft.js, we need to simulate user input
-        // Clear existing content
-        element.innerHTML = '';
-        
-        // Create Draft.js compatible structure
-        const dataBlock = document.createElement('div');
-        dataBlock.setAttribute('data-contents', 'true');
-        
-        const innerDiv = document.createElement('div');
-        innerDiv.className = '';
-        innerDiv.setAttribute('data-block', 'true');
-        innerDiv.setAttribute('data-editor', element.getAttribute('data-editor') || '');
-        innerDiv.setAttribute('data-offset-key', '0-0-0');
-        
-        const contentDiv = document.createElement('div');
-        contentDiv.setAttribute('data-offset-key', '0-0-0');
-        contentDiv.className = 'public-DraftStyleDefault-block public-DraftStyleDefault-ltr';
-        
-        const span = document.createElement('span');
-        span.setAttribute('data-offset-key', '0-0-0');
-        span.textContent = value;
-        
-        contentDiv.appendChild(span);
-        innerDiv.appendChild(contentDiv);
-        dataBlock.appendChild(innerDiv);
-        element.appendChild(dataBlock);
-        
-        // Trigger events
-        element.dispatchEvent(new Event('input', { bubbles: true }));
-        element.dispatchEvent(new Event('change', { bubbles: true }));
-        
-        console.log('Filled Draft.js editor:', field.name);
-        return true;
-      }
-    }
-    
-    // Generic contenteditable
-    if (field.isContentEditable || field.tagName.toLowerCase() === 'div' || field.tagName.toLowerCase() === 'iframe') {
-      let element = null;
-      
-      if (field.tagName.toLowerCase() === 'iframe') {
-        // Handle iframe-based editors
-        try {
-          const iframe = document.getElementById(field.id);
-          if (iframe) {
-            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-            if (iframeDoc && iframeDoc.body) {
-              iframeDoc.body.innerHTML = value;
-              console.log('Filled iframe editor:', field.name);
-              return true;
-            }
-          }
-        } catch (e) {
-          console.log('Cannot access iframe content:', e);
-        }
-      } else {
-        // Contenteditable div
-        element = document.getElementById(field.id) || document.querySelector(`[name="${field.name}"]`);
-        if (!element) {
-          element = document.querySelector(`#${field.name}`);
-        }
-        
-        if (element) {
-          element.innerHTML = value;
-          element.dispatchEvent(new Event('input', { bubbles: true }));
-          element.dispatchEvent(new Event('change', { bubbles: true }));
-          console.log('Filled contenteditable:', field.name);
-          return true;
-        }
-      }
-    }
-    
-    // Fallback: try to find textarea/input with same name
-    const textarea = document.querySelector(`textarea[name="${field.name}"]`);
-    if (textarea) {
-      textarea.value = value;
-      textarea.dispatchEvent(new Event('input', { bubbles: true }));
-      textarea.dispatchEvent(new Event('change', { bubbles: true }));
-      console.log('Filled textarea fallback:', field.name);
+    // Strategy 1: Direct innerHTML on contenteditable or div elements
+    if (field.isContentEditable || field.tagName.toLowerCase() === 'div') {
+      field.innerHTML = value;
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+      field.dispatchEvent(new Event('change', { bubbles: true }));
+      console.log('[RichText Fill] ✅ Filled via innerHTML');
       return true;
     }
     
-    console.log('Could not fill rich text editor:', field.name, editorType);
+    // Strategy 2: For Quill - find .ql-editor inside
+    const qlEditor = field.querySelector?.('.ql-editor');
+    if (qlEditor) {
+      qlEditor.innerHTML = value;
+      qlEditor.dispatchEvent(new Event('input', { bubbles: true }));
+      console.log('[RichText Fill] ✅ Filled Quill via .ql-editor');
+      return true;
+    }
+    
+    // Strategy 3: For iframe editors
+    if (field.tagName.toLowerCase() === 'iframe') {
+      const iframeDoc = field.contentDocument || field.contentWindow?.document;
+      if (iframeDoc?.body) {
+        iframeDoc.body.innerHTML = value;
+        console.log('[RichText Fill] ✅ Filled iframe editor');
+        return true;
+      }
+    }
+    
+    // Strategy 4: TinyMCE via API
+    if (window.tinymce) {
+      const editor = window.tinymce.get(field.id || field.name);
+      if (editor) {
+        editor.setContent(value);
+        editor.save();
+        console.log('[RichText Fill] ✅ Filled TinyMCE');
+        return true;
+      }
+    }
+    
+    // Strategy 5: CKEditor via API
+    if (window.CKEDITOR) {
+      const editor = window.CKEDITOR.instances[field.id || field.name];
+      if (editor) {
+        editor.setData(value);
+        console.log('[RichText Fill] ✅ Filled CKEditor');
+        return true;
+      }
+    }
+    
+    console.error('[RichText Fill] ❌ Could not fill element');
     return false;
   } catch (error) {
-    console.error('Error filling rich text field:', field.name, error);
+    console.error('[RichText Fill] Error:', error);
     return false;
   }
 }
