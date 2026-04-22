@@ -584,16 +584,30 @@ function fillRichTextField(field, value) {
     
     // Quill
     if (editorType === 'quill') {
-      const container = document.getElementById(field.id) || document.querySelector(`[name="${field.name}"]`);
-      if (container) {
-        const quill = container.__quill || container.querySelector('.ql-container')?.__quill;
-        if (quill) {
-          quill.root.innerHTML = value;
-          quill.setText(value);
-          quill.clipboard.dangerouslyPasteHTML(value);
-          console.log('Filled Quill editor:', field.name);
-          return true;
+      // Try multiple strategies to find Quill
+      let quill = null;
+      
+      // Strategy 1: Find by ID
+      if (field.id) {
+        const el = document.getElementById(field.id);
+        quill = el?.__quill || el?.querySelector('.ql-container')?.__quill;
+      }
+      
+      // Strategy 2: Find any Quill instance on page
+      if (!quill) {
+        const allQuillContainers = document.querySelectorAll('.ql-container');
+        for (const container of allQuillContainers) {
+          if (container.__quill) {
+            quill = container.__quill;
+            break;
+          }
         }
+      }
+      
+      if (quill) {
+        quill.clipboard.dangerouslyPasteHTML(value);
+        console.log('Filled Quill editor:', field.name);
+        return true;
       }
     }
     
