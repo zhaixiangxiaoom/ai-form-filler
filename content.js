@@ -421,26 +421,42 @@ function getPageContext() {
 
 // Fill form fields with generated data
 function fillFormFields(formData) {
+  console.log('[AI Form Filler] Starting to fill fields:', formData);
+  console.log('[AI Form Filler] Total fields to fill:', Object.keys(formData).length);
+  
   isProcessing = true;
   let filledCount = 0;
   
   Object.keys(formData).forEach(fieldName => {
     const value = formData[fieldName];
+    console.log(`[AI Form Filler] Processing field: ${fieldName}`, 'Type:', typeof value, 'Value preview:', String(value).substring(0, 100));
     
     // First try to find by name/id
     const fields = findFieldsByName(fieldName);
+    console.log(`[AI Form Filler] Found ${fields.length} elements for field: ${fieldName}`);
     
     if (fields.length > 0) {
       fields.forEach(field => {
+        console.log(`[AI Form Filler] Attempting to fill element:`, field.tagName, field.type || '', field.name || field.id || '');
         if (fillField(field, value)) {
           filledCount++;
+          console.log(`[AI Form Filler] ✅ Successfully filled: ${fieldName}`);
+        } else {
+          console.log(`[AI Form Filler] ❌ Failed to fill: ${fieldName}`);
         }
       });
     } else {
       // If not found by name, try to match by label or placeholder
+      console.log(`[AI Form Filler] No elements found by name, trying label/placeholder match for: ${fieldName}`);
       const matchedField = findFieldByLabelOrPlaceholder(fieldName, value);
-      if (matchedField && fillField(matchedField, value)) {
-        filledCount++;
+      if (matchedField) {
+        console.log(`[AI Form Filler] Found matching field by label/placeholder:`, matchedField.tagName, matchedField.name || matchedField.id || '');
+        if (fillField(matchedField, value)) {
+          filledCount++;
+          console.log(`[AI Form Filler] ✅ Successfully filled via label/placeholder: ${fieldName}`);
+        }
+      } else {
+        console.log(`[AI Form Filler] ❌ Could not find any matching field for: ${fieldName}`);
       }
     }
   });
@@ -448,7 +464,7 @@ function fillFormFields(formData) {
   // Dispatch events to trigger any listeners
   dispatchFormEvents();
   
-  console.log(`AI Form Filler: Successfully filled ${filledCount} fields`);
+  console.log(`[AI Form Filler] Completed! Successfully filled ${filledCount} fields`);
   isProcessing = false;
   
   // Show notification

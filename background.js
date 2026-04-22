@@ -125,8 +125,9 @@ async function handleGenerateFormData(fields, context) {
 // Build AI prompt based on form fields
 function buildAIPrompt(fields, context, language) {
   const fieldDescriptions = fields.map(field => {
+    const isRichText = field.type && field.type.startsWith('richtext');
     const info = [
-      `- "${field.name}" (type: ${field.type}`,
+      `- "${field.name}" (type: ${field.type}${isRichText ? ' - RICH TEXT EDITOR, generate HTML content' : ''}`,
       field.label ? `label: "${field.label}"` : '',
       field.placeholder ? `placeholder: "${field.placeholder}"` : '',
       field.required ? 'required' : '',
@@ -137,6 +138,17 @@ function buildAIPrompt(fields, context, language) {
   
   const contextInfo = context ? `\nPage context: ${context}` : '';
   const languageInfo = language === 'zh' ? 'Please generate data in Chinese.' : 'Please generate data in English.';
+  
+  // Check if there are any rich text editors
+  const hasRichText = fields.some(f => f.type && f.type.startsWith('richtext'));
+  const richTextInstruction = hasRichText ? `
+7. For RICH TEXT EDITOR fields (type starts with "richtext"), generate HTML content with proper formatting:
+   - Use <p> for paragraphs
+   - Use <h2>, <h3> for headings
+   - Use <strong>, <em> for emphasis
+   - Use <ul>, <li> for lists
+   - Make it look professional and well-formatted
+   - Example: "<h2>Introduction</h2><p>This is a <strong>comprehensive</strong> guide.</p>"` : '';
   
   return `Generate realistic data for the following form fields:${contextInfo}
 
@@ -149,13 +161,14 @@ Requirements:
 3. For email fields, generate valid email addresses
 4. For phone fields, generate valid phone numbers
 5. For select/radio fields, choose from the provided options
-6. ${languageInfo}
-7. Do NOT include any explanation, just return the JSON object
+6. ${languageInfo}${richTextInstruction}
+8. Do NOT include any explanation, just return the JSON object
 
 Example format:
 {
   "username": "john_doe",
   "email": "john@example.com",
   "phone": "+1-555-0123"
+  ${hasRichText ? ',\n  "article_content": "<h2>Introduction</h2><p>This is a <strong>well-formatted</strong> article with proper HTML tags.</p>"' : ''}
 }`;
 }
