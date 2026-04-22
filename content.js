@@ -80,8 +80,10 @@ function detectAllForms() {
 
 // Extract information from a form field
 function extractFieldInfo(field, index) {
+  const fieldName = field.name || field.id || field.getAttribute('data-slot') || `field_${index}`;
+  
   const fieldInfo = {
-    name: field.name || field.id || `field_${index}`,
+    name: fieldName,
     type: field.type || field.tagName.toLowerCase(),
     tagName: field.tagName.toLowerCase(),
     label: getFieldLabel(field),
@@ -89,7 +91,10 @@ function extractFieldInfo(field, index) {
     required: field.required || false,
     value: field.value || '',
     id: field.id || '',
-    className: field.className || ''
+    className: field.className || '',
+    dataSlot: field.getAttribute('data-slot') || '',
+    // Store unique selector for reliable filling
+    selector: generateFieldSelector(field, index)
   };
   
   // Get options for select elements
@@ -107,6 +112,27 @@ function extractFieldInfo(field, index) {
   }
   
   return fieldInfo;
+}
+
+// Generate unique selector for field
+function generateFieldSelector(field, index) {
+  // Try to create a unique CSS selector
+  if (field.id) {
+    return `#${field.id}`;
+  }
+  
+  if (field.name) {
+    return `[name="${field.name}"]`;
+  }
+  
+  if (field.getAttribute('data-slot')) {
+    return `[data-slot="${field.getAttribute('data-slot')}"]`;
+  }
+  
+  // Use tag name + placeholder + index as fallback
+  const tagName = field.tagName.toLowerCase();
+  const placeholder = field.placeholder ? `[placeholder="${field.placeholder}"]` : '';
+  return `${tagName}${placeholder}:nth-of-type(${index + 1})`;
 }
 
 // Get label text for a field
@@ -398,13 +424,23 @@ function fillFormFields(formData) {
   
   Object.keys(formData).forEach(fieldName => {
     const value = formData[fieldName];
+    
+    // First try to find by name/id
     const fields = findFieldsByName(fieldName);
     
-    fields.forEach(field => {
-      if (fillField(field, value)) {
+    if (fields.length > 0) {
+      fields.forEach(field => {
+        if (fillField(field, value)) {
+          filledCount++;
+        }
+      });
+    } else {
+      // If not found by name, try to match by label or placeholder
+      const matchedField = findFieldByLabelOrPlaceholder(fieldName, value);
+      if (matchedField && fillField(matchedField, value)) {
         filledCount++;
       }
-    });
+    }
   });
   
   // Dispatch events to trigger any listeners
@@ -431,7 +467,53 @@ function findFieldsByName(name) {
     if (!fields.includes(f)) fields.push(f);
   });
   
+  // Search by data-slot attribute (for modern frameworks)
+  if (fields.length === 0) {
+    const byDataSlot = document.querySelectorAll(`[data-slot="${name}"]`);
+    byDataSlot.forEach(f => {
+      if (!fields.includes(f)) fields.push(f);
+    });
+  }
+  
+  // Search by placeholder text (fallback)
+  if (fields.length === 0) {
+    const allTextareas = document.querySelectorAll('textarea');
+    allTextareas.forEach(f => {
+      if (!fields.includes(f) && f.placeholder && 
+          (f.placeholder.includes(name) || name.includes(f.placeholder))) {
+        fields.push(f);
+      }
+    });
+  }
+  
   return fields;
+}
+
+// Find field by label text or placeholder when name doesn't match
+function findFieldByLabelOrPlaceholder(fieldName, value) {
+  // Try to find textarea/input with matching placeholder
+  const allFields = document.querySelectorAll('textarea, input:not([type="hidden"]):not([type="submit"]):not([type="button"])');
+  
+  for (let field of allFields) {
+    // Check placeholder match
+    if (field.placeholder && field.placeholder.includes(fieldName)) {
+      return field;
+    }
+    
+    // Check label match
+    const label = getFieldLabel(field);
+    if (label && label.includes(fieldName)) {
+      return field;
+    }
+    
+    // Check data-slot match
+    const dataSlot = field.getAttribute('data-slot');
+    if (dataSlot && dataSlot.includes(fieldName)) {
+      return field;
+    }
+  }
+  
+  return null;
 }
 
 // Fill a single field with value
@@ -699,6 +781,16 @@ style.textContent = `
     from { transform: translateX(0); opacity: 1; }
     to { transform: translateX(400px); opacity: 0; }
   }
+`;
+document.head.appendChild(style);
+
+// Auto-detect forms on page load
+setTimeout(() => {
+  const forms = detectAllForms();
+  if (forms.length > 0) {
+    console.log(`AI Form Filler: Detected ${forms.length} form(s) on page`);
+  }
+}, 1000);
 `;
 document.head.appendChild(style);
 
