@@ -5,8 +5,7 @@
   "description": "Automatically detect and fill form fields using AI-generated data",
   "permissions": [
     "activeTab",
-    "storage",
-    "scripting"
+    "storage"
   ],
   "host_permissions": [
     "<all_urls>"
