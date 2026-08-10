@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FormPilot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <div class="container">
+    <header class="hero">
+      <div class="hero-badge">
+        <img class="logo" src="icons/icon48.png" alt="FormPilot logo">
+      </div>
+      <div class="hero-text">
+        <h1>FormPilot</h1>
+        <p class="subtitle">智填领航 · 看懂表单，填对内容</p>
+      </div>
+    </header>
+
+    <div class="tabs">
+      <button id="tab-fill" class="tab-btn active">✍️ 填充助手</button>
+      <button id="tab-assets" class="tab-btn">💾 数据资产</button>
+    </div>
+
+    <!-- ============ Tab 1: fill assistant ============ -->
+    <div id="fill-tab" class="tab-content active">
+      <div id="status-message" class="status-message"></div>
+
+      <!-- Site template banner -->
+      <div id="template-banner" class="template-banner" style="display: none;">
+        <span id="template-banner-text">⭐ 该站点已保存填充模板，将优先使用</span>
+      </div>
+
+      <!-- Multi-step form banner -->
+      <div id="step-banner" class="step-banner" style="display: none;">
+        <span>📄 检测到页面出现新字段（可能切换了步骤）</span>
+        <button id="step-fill-btn" class="btn-mini primary">继续填充</button>
+      </div>
+
+      <div class="actions">
+        <button id="smart-btn" class="btn btn-success">⚡ 一键智能填充</button>
+        <button id="detect-btn" class="btn btn-secondary">🔍 检测预览</button>
+        <button id="batch-btn" class="btn btn-secondary" style="display: none;">🚀 批量填充</button>
+      </div>
+
+      <!-- Field editor: preview, edit, regenerate, then fill -->
+      <div id="editor-section" class="editor-section" style="display: none;">
+        <div class="editor-header">
+          <h3>📝 字段预览与编辑</h3>
+          <div class="editor-actions">
+            <button id="generate-btn" class="btn-mini primary">🧠 生成内容</button>
+            <button id="fill-btn" class="btn-mini success" disabled>✍️ 填入页面</button>
+          </div>
+        </div>
+        <div id="field-editor" class="field-editor"></div>
+      </div>
+
+      <!-- Fill report -->
+      <div id="report-section" class="report-section" style="display: none;">
+        <h3>📋 填充报告</h3>
+        <div id="report-content"></div>
+        <div class="report-actions">
+          <button id="save-template-btn" class="btn btn-secondary" style="display: none;">⭐ 存为本站模板</button>
+          <button id="undo-btn" class="btn btn-secondary" style="display: none;">↩️ 撤销上次填充</button>
+        </div>
+        <!-- Correction learning banner -->
+        <div id="learn-banner" class="learn-banner" style="display: none;">
+          <span id="learn-banner-text">✏️ 检测到您手动修正了部分内容</span>
+          <button id="learn-save-btn" class="btn-mini primary">记住偏好</button>
+          <button id="learn-dismiss-btn" class="btn-mini">忽略</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ Tab 2: data assets ============ -->
+    <div id="assets-tab" class="tab-content">
+
+      <section class="asset-section">
+        <div class="asset-header">
+          <h3>🎭 数字人设</h3>
+          <div class="asset-actions">
+            <button id="persona-add-real" class="btn-mini primary">+ 真实档案</button>
+            <button id="persona-add-random" class="btn-mini">+ 随机身份</button>
+          </div>
+        </div>
+        <p class="asset-hint">启用后，所有表单将围绕同一个人设生成，邮箱/电话/姓名前后一致。</p>
+        <div id="persona-list" class="asset-list"></div>
+        <div id="persona-form" class="asset-form" style="display: none;">
+          <input id="pf-name" placeholder="档案名称（如：我的工作档案）">
+          <input id="pf-realname" placeholder="姓名">
+          <input id="pf-phone" placeholder="手机号">
+          <input id="pf-email" placeholder="邮箱">
+          <input id="pf-company" placeholder="公司">
+          <input id="pf-address" placeholder="地址">
+          <input id="pf-city" placeholder="城市">
+          <input id="pf-username" placeholder="用户名">
+          <div class="asset-form-actions">
+            <button id="persona-save" class="btn-mini primary">保存</button>
+            <button id="persona-cancel" class="btn-mini">取消</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="asset-section">
+        <div class="asset-header">
+          <h3>⭐ 站点模板</h3>
+        </div>
+        <p class="asset-hint">填充成功后可"存为本站模板"，下次同站一键复用，无需 AI。</p>
+        <div id="template-list" class="asset-list"></div>
+      </section>
+
+      <section class="asset-section">
+        <div class="asset-header">
+          <h3>🛠️ 自定义规则</h3>
+        </div>
+        <div class="asset-form" id="rule-form">
+          <div class="rule-row">
+            <select id="rf-match-type">
+              <option value="semantic">按语义</option>
+              <option value="name">按字段名</option>
+              <option value="label">按标签文字</option>
+            </select>
+            <select id="rf-semantic" style="display: none;"></select>
+            <input id="rf-match-value" placeholder="匹配值（如 phone / contact / 联系）">
+          </div>
+          <input id="rf-value" placeholder="固定填充值">
+          <div class="rule-row">
+            <select id="rf-scope">
+              <option value="global">全局生效</option>
+              <option value="domain">仅当前站点</option>
+            </select>
+            <button id="rule-save" class="btn-mini primary">+ 添加规则</button>
+          </div>
+        </div>
+        <div id="rule-list" class="asset-list"></div>
+      </section>
+
+      <section class="asset-section">
+        <div class="asset-header">
+          <h3>📦 备份与团队共享</h3>
+        </div>
+        <p class="asset-hint">导出 JSON 用于跨设备备份全量资产；分享码仅含模板与规则（不含人设隐私），可发给团队成员粘贴导入。</p>
+        <div class="asset-actions io-actions">
+          <button id="export-btn" class="btn-mini primary">⬇️ 导出 JSON</button>
+          <button id="import-btn" class="btn-mini">⬆️ 导入 JSON</button>
+          <button id="share-gen-btn" class="btn-mini">🔗 生成分享码</button>
+          <button id="share-open-btn" class="btn-mini">📥 粘贴分享码</button>
+        </div>
+        <input type="file" id="import-file" accept=".json,application/json" style="display: none;">
+        <textarea id="share-box" class="share-box" style="display: none;" placeholder="分享码将显示在此（可复制）；导入时粘贴团队分享码"></textarea>
+        <div id="share-import-actions" class="asset-form-actions" style="display: none;">
+          <button id="share-import-btn" class="btn-mini primary">导入分享码</button>
+          <button id="share-cancel-btn" class="btn-mini">取消</button>
+        </div>
+      </section>
+
+    </div>
+
+    <footer>
+      <p class="footer-text">FormPilot v1.4.0 · 快捷键 Alt+Shift+F</p>
+    </footer>
+  </div>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>

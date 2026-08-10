@@ -1,8 +1,8 @@
-# Rich Text Editor Support - AI Form Filler
+# Rich Text Editor Support - FormPilot
 
 ## 📝 Overview
 
-The AI Form Filler extension now fully supports **rich text editors** (富文本编辑器), also known as WYSIWYG (What You See Is What You Get) editors. This includes popular editors like TinyMCE, CKEditor, Quill, Froala, Summernote, and generic contenteditable elements.
+The FormPilot extension now fully supports **rich text editors** (富文本编辑器), also known as WYSIWYG (What You See Is What You Get) editors. This includes popular editors like TinyMCE, CKEditor, Quill, Froala, Summernote, and generic contenteditable elements.
 
 ## 🎯 Supported Editors
 
@@ -180,7 +180,7 @@ The extension comes with a test page: `test-richtext.html`
 
 **How to Test:**
 1. Open `test-richtext.html` in Chrome
-2. Click AI Form Filler extension icon
+2. Click FormPilot extension icon
 3. Click "Detect Forms"
 4. Verify rich text editors are detected
 5. Click "Generate & Fill"
@@ -368,7 +368,7 @@ To verify rich text editor support is working:
 
 1. **Check Console Logs**:
    ```
-   AI Form Filler: Detected 2 rich text editor(s)
+   FormPilot: Detected 2 rich text editor(s)
    Filled TinyMCE editor: article_content
    Filled Quill editor: quill_editor
    ```
@@ -385,7 +385,7 @@ To verify rich text editor support is working:
 
 ## 🎉 Summary
 
-Rich text editor support enables the AI Form Filler to:
+Rich text editor support enables FormPilot to:
 - ✅ Detect all major WYSIWYG editors
 - ✅ Generate appropriate HTML content
 - ✅ Fill editors using their native APIs

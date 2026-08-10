@@ -1,7 +1,34 @@
-// Popup script for AI Form Filler extension
+// Popup script for FormPilot extension
 
 let detectedForms = [];
 let currentConfig = {};
+let lastTabId = null;
+
+// Promise wrapper for tab messaging
+function sendTabMessage(tabId, message) {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.sendMessage(tabId, message, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+      } else {
+        resolve(response);
+      }
+    });
+  });
+}
+
+// Promise wrapper for runtime messaging
+function sendRuntimeMessage(message) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(message, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+      } else {
+        resolve(response);
+      }
+    });
+  });
+}
 
 // Initialize popup
 document.addEventListener('DOMContentLoaded', async () => {
@@ -53,45 +80,42 @@ function setupTabs() {
 
 // Setup event listeners
 function setupEventListeners() {
-  // Detect forms button
+  // One-click smart fill
+  document.getElementById('smart-btn').addEventListener('click', smartFill);
+  
+  // Preview-only detection
   document.getElementById('detect-btn').addEventListener('click', detectForms);
   
-  // Fill button
-  document.getElementById('fill-btn').addEventListener('click', generateAndFill);
+  // Undo last fill
+  document.getElementById('undo-btn').addEventListener('click', undoFill);
   
   // Settings form
   document.getElementById('settings-form').addEventListener('submit', saveSettings);
 }
 
-// Detect forms on current page
+// Detect forms on current page (preview only)
 async function detectForms() {
   showStatus('Detecting forms on page...', 'loading');
   
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    lastTabId = tab.id;
     
-    chrome.tabs.sendMessage(tab.id, { action: 'detectForms' }, (response) => {
-      if (chrome.runtime.lastError) {
-        showStatus('Error: Could not connect to page. Please refresh and try again.', 'error');
-        return;
-      }
+    const response = await sendTabMessage(tab.id, { action: 'detectForms' });
+    
+    if (response && response.forms) {
+      detectedForms = response.forms;
+      displayFormInfo(response.forms);
       
-      if (response && response.forms) {
-        detectedForms = response.forms;
-        displayFormInfo(response.forms);
-        
-        if (response.forms.length > 0) {
-          const totalFields = response.forms.reduce((sum, form) => sum + form.fields.length, 0);
-          showStatus(`✅ Detected ${response.forms.length} form(s) with ${totalFields} fields`, 'success');
-          document.getElementById('fill-btn').disabled = false;
-        } else {
-          showStatus('No forms detected on this page', 'info');
-          document.getElementById('fill-btn').disabled = true;
-        }
+      if (response.forms.length > 0) {
+        const totalFields = response.forms.reduce((sum, form) => sum + form.fields.length, 0);
+        showStatus(`✅ Detected ${response.forms.length} form(s) with ${totalFields} fields`, 'success');
+      } else {
+        showStatus('No forms detected on this page', 'info');
       }
-    });
+    }
   } catch (error) {
-    showStatus('Error detecting forms: ' + error.message, 'error');
+    showStatus('Error: Could not connect to page. Please refresh and try again.', 'error');
   }
 }
 
@@ -140,75 +164,146 @@ function displayFormInfo(forms) {
   }
 }
 
-// Generate AI data and fill form
-async function generateAndFill() {
-  if (detectedForms.length === 0) {
-    showStatus('Please detect forms first', 'error');
-    return;
-  }
-  
-  if (!currentConfig.apiKey) {
-    showStatus('Please configure your API key in Settings', 'error');
-    // Switch to settings tab
-    document.querySelector('[data-tab="settings"]').click();
-    return;
-  }
-  
-  showStatus('🤖 Generating form data with AI...', 'loading');
-  document.getElementById('fill-btn').disabled = true;
+// One-click smart fill: detect -> hybrid generate -> fill -> report
+async function smartFill() {
+  const smartBtn = document.getElementById('smart-btn');
+  smartBtn.disabled = true;
+  hideReport();
   
   try {
-    // Collect all fields from all forms
-    const allFields = [];
-    detectedForms.forEach(form => {
-      allFields.push(...form.fields);
-    });
+    // Step 1: Detect forms
+    showStatus('🔍 Detecting forms on page...', 'loading');
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    lastTabId = tab.id;
     
-    // Get page context from first form
+    const detectResponse = await sendTabMessage(tab.id, { action: 'detectForms' });
+    if (!detectResponse || !detectResponse.forms || detectResponse.forms.length === 0) {
+      showStatus('No forms detected on this page', 'info');
+      return;
+    }
+    
+    detectedForms = detectResponse.forms;
+    displayFormInfo(detectedForms);
+    
+    // Step 2: Hybrid generation (rule engine + AI)
+    showStatus('🧠 Generating fill content (rules + AI)...', 'loading');
+    const allFields = [];
+    detectedForms.forEach(form => allFields.push(...form.fields));
     const context = detectedForms[0]?.context || null;
     
-    // Send request to background script for AI generation
-    chrome.runtime.sendMessage(
-      {
-        action: 'generateFormData',
-        fields: allFields,
-        context: context
-      },
-      (response) => {
-        if (chrome.runtime.lastError) {
-          showStatus('Error: ' + chrome.runtime.lastError.message, 'error');
-          document.getElementById('fill-btn').disabled = false;
-          return;
-        }
-        
-        if (response.error) {
-          showStatus('❌ ' + response.error, 'error');
-          document.getElementById('fill-btn').disabled = false;
-          return;
-        }
-        
-        if (response.success && response.data) {
-          showStatus('✨ Filling form with AI-generated data...', 'loading');
-          
-          // Send fill command to content script
-          chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            if (tabs[0]) {
-              chrome.tabs.sendMessage(tabs[0].id, {
-                action: 'fillForm',
-                formData: response.data
-              });
-              
-              showStatus('✅ Form filled successfully!', 'success');
-              document.getElementById('fill-btn').disabled = false;
-            }
-          });
-        }
-      }
-    );
+    const gen = await sendRuntimeMessage({
+      action: 'generateFormData',
+      fields: allFields,
+      context: context
+    });
+    
+    if (gen.error) {
+      showStatus('❌ ' + gen.error, 'error');
+      return;
+    }
+    
+    const data = gen.data || {};
+    if (Object.keys(data).length === 0) {
+      showStatus('❌ No fill content could be generated. Please configure your API key in Settings.', 'error');
+      return;
+    }
+    
+    // Step 3: Fill and get validation report
+    showStatus('✍️ Filling form...', 'loading');
+    const report = await sendTabMessage(tab.id, {
+      action: 'fillForm',
+      formData: data
+    });
+    
+    // Step 4: Show report
+    displayReport(gen, report || {});
   } catch (error) {
-    showStatus('❌ Error: ' + error.message, 'error');
-    document.getElementById('fill-btn').disabled = false;
+    showStatus('❌ Error: ' + error.message + '. Try refreshing the page.', 'error');
+  } finally {
+    smartBtn.disabled = false;
   }
+}
+
+// Render the fill report with stats and validation issues
+function displayReport(gen, report) {
+  const section = document.getElementById('report-section');
+  const content = document.getElementById('report-content');
+  const stats = gen.stats || {};
+  const invalidFields = report.invalidFields || [];
+  const notFound = report.notFound || [];
+  const skipped = stats.skippedFields || [];
+  
+  let html = `
+    <div class="report-summary ${invalidFields.length === 0 ? 'ok' : 'warn'}">
+      ✅ Filled ${report.filledCount ?? 0} fields
+      (🧩 rules: ${stats.ruleCount ?? 0} · 🤖 AI: ${stats.aiCount ?? 0})
+    </div>
+  `;
+  
+  if (invalidFields.length > 0) {
+    html += `<div class="report-group-title">⚠️ ${invalidFields.length} field(s) failed page validation:</div>`;
+    invalidFields.forEach(f => {
+      html += `
+        <div class="report-item invalid">
+          <div class="report-field-name">${escapeHtml(f.label || f.name)}</div>
+          <div class="report-field-msg">${escapeHtml(f.message)}</div>
+        </div>
+      `;
+    });
+  }
+  
+  if (notFound.length > 0) {
+    html += `<div class="report-group-title">🔍 ${notFound.length} field(s) not matched on page:</div>`;
+    html += `<div class="report-item muted">${escapeHtml(notFound.join(', '))}</div>`;
+  }
+  
+  if (skipped.length > 0) {
+    html += `<div class="report-group-title">⏭️ ${skipped.length} open-ended field(s) skipped:</div>`;
+    html += `<div class="report-item muted">${escapeHtml(skipped.join(', '))}<br>` +
+      `${gen.aiError ? escapeHtml(gen.aiError) : 'AI did not return these fields.'}</div>`;
+  }
+  
+  content.innerHTML = html;
+  section.style.display = 'block';
+  
+  // Undo button
+  const undoBtn = document.getElementById('undo-btn');
+  undoBtn.style.display = report.canUndo ? 'flex' : 'none';
+  
+  if (invalidFields.length > 0) {
+    showStatus(`⚠️ Filled ${report.filledCount} fields, ${invalidFields.length} failed validation`, 'error');
+  } else {
+    showStatus(`✅ Form filled successfully! (${report.filledCount} fields)`, 'success');
+  }
+}
+
+// Hide report section
+function hideReport() {
+  document.getElementById('report-section').style.display = 'none';
+  document.getElementById('undo-btn').style.display = 'none';
+}
+
+// Undo the last fill via snapshot restore
+async function undoFill() {
+  if (!lastTabId) return;
+  try {
+    const response = await sendTabMessage(lastTabId, { action: 'undoFill' });
+    if (response && response.success) {
+      showStatus(`↩️ Restored ${response.restoredCount} fields to previous values`, 'success');
+      hideReport();
+    } else {
+      showStatus(response?.error || 'Nothing to undo', 'info');
+    }
+  } catch (error) {
+    showStatus('Undo failed: ' + error.message, 'error');
+  }
+}
+
+// Escape HTML for safe rendering
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = String(text ?? '');
+  return div.innerHTML;
 }
 
 // Save settings

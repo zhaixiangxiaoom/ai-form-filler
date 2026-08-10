@@ -1,224 +1,172 @@
-# AI Form Filler - Chrome Extension
+# ✈️ FormPilot · 智填领航
 
-A powerful Chrome browser extension that automatically detects form fields on webpages and fills them with AI-generated data using Alibaba Cloud's Bailian (百炼) large language models.
+> AI 智能填表助手 —— 看懂表单、填对内容、记住你的数据。
 
-## Features
+FormPilot 是一款 Chrome 浏览器扩展：自动识别网页上的表单字段，理解每个字段的填写要求，用 AI 生成**符合页面语境与校验规则**的内容并一键填充。不只是"随机数据生成器"，而是越用越懂你的个人填表助手。
 
-- 🔍 **Automatic Form Detection**: Scans webpages to identify all form fields including inputs, selects, textareas, radios, checkboxes, and rich text editors
-- 🤖 **AI-Powered Data Generation**: Uses Alibaba Cloud's Bailian Qwen models to generate realistic, contextually appropriate form data
-- ⚡ **One-Click Form Filling**: Fill entire forms instantly with a single click
-- 🌍 **Multi-Language Support**: Generate form data in English, Chinese, Japanese, Korean, Spanish, and French
-- ⚙️ **Customizable Settings**: Configure API endpoint, model selection, and language preferences
-- 🔒 **Privacy-Focused**: API keys stored locally, no data sent to third parties
-- 🎨 **Modern UI**: Clean, intuitive popup interface with real-time form preview
+## ✨ 核心特性
 
-## Installation
+### 现已支持
 
-### Step 1: Download/Clone the Extension
+- 🔍 **智能表单识别**：扫描页面所有表单（含 `<form>` 之外的独立字段），提取字段名、类型、标签、占位符、可选项与 **pattern/min/max/maxlength 等校验约束**
+- ⚡ **一键智能填充**：检测 → 生成 → 填充 → 校验报告，一个按钮完成全流程
+- 🧩 **混合生成引擎**：邮箱/手机/日期/选项等结构化字段由本地规则引擎生成（100% 格式合法、零延迟），开放性内容交给 AI
+- ✅ **填充后校验报告**：自动回读页面校验结果，列出未通过校验的字段与原因
+- ↩️ **一键撤销**：填充前自动快照，随时恢复原始值
+- 📝 **Side Panel 预览编辑**：主界面升级为浏览器侧边栏，生成后逐字段编辑、单字段 🔄 重新生成，确认后再填入页面
+- 🧩 **自定义组件支持**：基于 ARIA 角色识别 Ant Design / Element Plus 等 div 模拟下拉框，自动开弹层、选中匹配选项
+- 📄 **多步表单感知**：填充后自动监听页面，步骤切换出现新字段时提醒"继续填充"
+- ⌨️ **快捷键与右键菜单**：`Alt+Shift+F` 一键填充；页面右键菜单直达
+- 🧠 **上下文感知生成**：结合页面标题、URL、字段语义构建提示词，让 AI 理解"这是什么表单"，生成连贯合理的内容
+- ✅ **约束合规填充**：select/radio/checkbox 严格从页面真实选项中选择；邮箱、电话等按合法格式生成
+- 📝 **富文本编辑器支持**：TinyMCE、CKEditor 4/5、Quill、Froala、Summernote、contenteditable、iframe 编辑器，生成带格式的专业 HTML 内容
+- ⚡ **框架兼容**：填充时触发 `input`/`change` 事件，兼容 React、Vue、Angular 及原生表单
+- 🌍 **多语言生成**：中文、英文、日文、韩文、西班牙文、法文
+- ⚙️ **灵活配置**：支持任意 OpenAI 兼容 API（默认阿里云百炼，也可接 Azure OpenAI、本地模型）
+- 🔒 **隐私优先**：API Key 本地加密存储；仅字段元数据发送给 AI，表单已填数据不出浏览器；纯结构化表单可无 API Key 使用
+- 🎭 **数字人设**：真实档案 / 随机测试身份，启用后全表单围绕同一身份生成，邮箱、电话、姓名前后一致
+- ⭐ **站点收藏模板**：填充成功后一键存为本站模板，下次同站优先复用、零 AI 调用
+- 🛠️ **自定义规则**：按语义 / 字段名 / 标签文字设定固定填充值，支持全局或仅当前站点
+- 🎓 **修正学习**：手动修正后一键“记住偏好”，自动沉淀为站点规则，越用越聪明
+- 🚀 **批量填充**：自动识别表格行/重复块，逐行生成互不相同的数据并行级填充
+- 📤 **导入导出**：全量资产 JSON 备份，跨设备一键迁移
+- 🔗 **团队分享码**：模板+规则编码为分享码（不含人设隐私），同事粘贴即同步
 
-**Option 1: Clone from GitHub**
+### 路线图（规划中）
+
+- ☁️ **云同步**：登录账号跨设备自动同步资产
+- 🧬 **模板自适应**：页面改版后按语义自动对齐旧模板字段
+
+## 📦 安装
+
+### 方式一：克隆仓库
+
 ```bash
 git clone https://github.com/zhaixiangxiaoom/ai-form-filler.git
 cd ai-form-filler
 ```
 
-**Option 2: Download ZIP**
-- Go to the GitHub repository
-- Click **Code** → **Download ZIP**
-- Extract the ZIP file
+### 方式二：下载 ZIP
 
-### Step 2: Add Icon Files (Optional but Recommended)
+在 GitHub 仓库页面点击 **Code → Download ZIP**，解压到任意目录。
 
-Create placeholder icons or add your own:
-- `icons/icon16.png` (16x16 pixels)
-- `icons/icon48.png` (48x48 pixels)
-- `icons/icon128.png` (128x128 pixels)
+### 加载到 Chrome
 
-**Note**: The extension will work without icons, but you'll see a default puzzle piece icon in Chrome.
+1. 打开 Chrome，访问 `chrome://extensions/`
+2. 右上角开启 **开发者模式**
+3. 点击 **加载已解压的扩展程序**，选择项目文件夹
+4. 工具栏出现 ✈️ FormPilot 图标即安装成功
 
-### Step 3: Load Extension in Chrome
+## 🔑 配置
 
-1. Open Chrome browser
-2. Navigate to `chrome://extensions/`
-3. Enable **Developer mode** (toggle in top-right corner)
-4. Click **Load unpacked** button
-5. Select the `ai-form-filler` folder
-6. The extension icon will appear in your browser toolbar
+### 获取阿里云百炼 API Key
 
-## Configuration
+1. 访问 [阿里云百炼平台](https://bailian.console.aliyun.com/) 并登录
+2. 进入 **API-KEY 管理**，创建新的 API Key
+3. 复制保存（只显示一次）
 
-### Getting an Alibaba Cloud Bailian API Key
+### 扩展内设置
 
-1. Visit [Alibaba Cloud Bailian Platform](https://bailian.console.aliyun.com/)
-2. Sign up or log in to your account
-3. Navigate to API Keys section (API-KEY 管理)
-4. Create a new API key
-5. Copy the key (you won't be able to see it again!)
+1. 点击工具栏 FormPilot 图标
+2. 切换到 **Settings** 标签页
+3. 填入 API Key，可选调整：
+   - **AI 模型**：Qwen-Turbo（快）/ Qwen-Plus（均衡，默认）/ Qwen-Max（质量最佳）
+   - **API URL**：默认百炼地址，也可换成任意 OpenAI 兼容端点
+   - **生成语言**：控制 AI 生成数据的语言
+4. 点击 **Save Settings**
 
-### Setting Up the Extension
+## 🚀 使用
 
-1. Click the AI Form Filler icon in Chrome toolbar
-2. Go to the **Settings** tab
-3. Enter your Alibaba Cloud Bailian API key
-4. (Optional) Configure:
-   - **API URL**: Use default for Bailian (`https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions`)
-   - **AI Model**: Choose between Qwen-Turbo (fast), Qwen-Plus (balanced), or Qwen-Max (best quality)
-   - **Language**: Select preferred language for generated data
-   - **Auto-fill**: Enable to automatically fill forms when detected
-5. Click **Save Settings**
+### 方式一：一键智能填充（最快）
 
-## Usage
+1. 打开任意包含表单的网页
+2. 点击工具栏 ✈️ 图标打开侧边栏 → **⚡ 一键智能填充**（或直接按 `Alt+Shift+F` / 页面右键 → FormPilot 智能填充）
+3. 查看填充报告；不满意可 **↩️ 撤销**，或在侧边栏编辑器中修改字段后重新填入
 
-### Basic Workflow
+### 方式二：预览-编辑-填充（精控）
 
-1. **Navigate to a webpage** with forms you want to fill
-2. **Click the extension icon** to open the popup
-3. **Click "Detect Forms"** to scan the page for form fields
-4. **Review detected fields** in the preview section
-5. **Click "Generate & Fill"** to use AI to generate and fill the form data
-6. The form will be automatically filled with realistic data!
+1. 侧边栏点击 **🔍 检测预览**，查看全部字段列表
+2. 点击 **🧠 生成内容**，每个字段出现可编辑的值，支持单字段 🔄 重新生成
+3. 按需修改后点击 **✍️ 填入页面**
+4. 多步表单：填充后切换步骤出现新字段时，侧边栏会提醒 **继续填充**
 
-### Supported Form Fields
+### 支持的字段类型
 
-- Text inputs (text, email, phone, url, password, etc.)
-- Textareas
-- Select dropdowns
-- Radio buttons
-- Checkboxes
-- Number inputs
-- Date inputs
-- **Rich Text Editors**:
-  - TinyMCE
-  - CKEditor (4 & 5)
-  - Quill
-  - Froala
-  - Summernote
-  - contenteditable divs
-  - iframe-based editors
+| 类别 | 说明 |
+|------|------|
+| 文本类 | text / email / tel / url / number / date / password 等全部 input 类型 |
+| 选择类 | select 下拉、radio 单选组、checkbox 多选 |
+| 长文本 | textarea |
+| 富文本 | TinyMCE、CKEditor 4/5、Quill、Froala、Summernote、contenteditable、iframe 编辑器 |
+| 自定义组件 | `role="combobox"` 类组件（Ant Design Select、Element Plus Select 等） |
 
-### Advanced Usage
+## 🏗️ 工作原理
 
-#### Using Custom AI APIs
+```
+用户点击 ⚡ 一键智能填充
+    ↓
+content.js 扫描 DOM → 提取字段元数据 + 校验约束 + 页面上下文
+    ↓
+background.js 字段语义分类：结构化字段 → 本地规则引擎直接生成
+    ↓
+开放性字段（长文本/富文本/未知语义）→ 构建上下文感知提示词 → AI API
+    ↓
+合并生成结果 → content.js 多策略匹配字段并填充（填充前自动快照）
+    ↓
+触发 input/change 事件 → 回读 checkValidity 校验 → 生成填充报告
+```
 
-The extension supports any OpenAI-compatible API. For example:
-
-- **Alibaba Cloud Bailian**: Use default URL `https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions`
-- **Azure OpenAI**: Set API URL to `https://your-resource.openai.azure.com/openai/deployments/your-deployment/chat/completions?api-version=2023-05-15`
-- **Local LLM**: Point to your local server running compatible models
-- **Other Providers**: Any service that implements the OpenAI chat completion API
-
-#### Multi-Language Support
-
-When you select a language in settings, the AI will generate form data in that language:
-- Names, addresses, and other locale-specific data will match the selected language
-- Perfect for testing internationalization or filling forms in different languages
-
-## Project Structure
+### 项目结构
 
 ```
 ai-form-filler/
-├── manifest.json          # Extension manifest (Chrome Manifest V3)
-├── background.js          # Service worker for AI integration
-├── content.js            # Content script for form detection & filling
-├── popup.html            # Popup UI
-├── popup.css             # Popup styles
-├── popup.js              # Popup logic
-├── icons/                # Extension icons
-│   ├── icon16.png
-│   ├── icon48.png
-│   └── icon128.png
-└── README.md             # This file
+├── manifest.json          # Chrome Manifest V3 配置
+├── background.js          # Service Worker：混合生成引擎与流程编排
+├── content.js             # 内容脚本：表单检测、智能填充与校验
+├── sidepanel.html/css/js  # 侧边栏主界面（预览编辑）
+├── popup.html/css/js      # 旧版弹窗（已停用，保留备用）
+├── icons/                 # 扩展图标（16/48/128）
+├── README.md              # 本文档
+└── 快速开始.md            # 中文快速上手指南
 ```
 
-## How It Works
+## 🔒 隐私与安全
 
-1. **Form Detection**: The content script (`content.js`) scans the DOM for form elements and extracts field metadata (name, type, label, placeholder, etc.)
+- ✅ API Key 仅存于 Chrome 本地加密存储，永不上报
+- ✅ 仅**字段元数据**（名称、类型、标签、选项）发送给配置的 AI 服务
+- ✅ 表单中已填写的数据不经过任何外部传输
+- ✅ 无埋点、无统计、代码完全开源可审计
 
-2. **AI Prompt Generation**: The background script (`background.js`) builds a detailed prompt describing all form fields and sends it to the AI model
+## 🧰 常见问题
 
-3. **Data Generation**: The AI generates realistic, contextually appropriate data for each field and returns it as JSON
+**检测不到表单？**
+刷新页面后重试；确认页面已完全加载；跨域 iframe 内的表单暂不支持。
 
-4. **Form Filling**: The content script receives the generated data and fills each field, triggering appropriate events (input, change) to ensure form validation works
+**AI 生成失败？**
+检查 API Key 是否正确且有余额；确认网络通畅；可尝试切换 Qwen-Turbo 模型。
 
-## Security & Privacy
+**部分字段没填上？**
+部分网站使用高度定制的表单组件；打开浏览器控制台查看匹配日志；动态延迟渲染的字段可稍等片刻重试。
 
-- ✅ API keys are stored in Chrome's local storage (encrypted)
-- ✅ No form data is sent to external servers (only field metadata)
-- ✅ All processing happens locally in your browser
-- ✅ Open-source code - fully transparent
+**调试入口：**
+- Popup：右键弹窗 → 检查
+- 内容脚本：右键页面 → 检查 → Console
+- Service Worker：`chrome://extensions/` → FormPilot → Service Worker
 
-## Troubleshooting
+## 🗺️ 版本计划
 
-### Extension not detecting forms
-- Refresh the page and try again
-- Make sure the page has fully loaded
-- Check if forms are in iframes (not currently supported)
+| 阶段 | 内容 |
+|------|------|
+| **P0 实用性** ✅ | 字段校验约束提取 · 规则引擎+AI 混合生成 · 一键流程 · 填充后校验报告 · 撤销 |
+| **P1 体验** ✅ | Side Panel 预览编辑 · 单字段重新生成 · ARIA 自定义组件 · 多步表单 · 快捷键/右键菜单 |
+| **P2 数据资产** ✅ | 数字人设 · 站点收藏模板 · 自定义规则 · 修正学习 |
+| **P3 进阶** ✅ | 模板导入导出 · 批量填充 · 团队分享码 |
+| **P4 展望** | 云同步 · 模板自适应 |
 
-### AI generation fails
-- Verify your API key is correct and has credits
-- Check your internet connection
-- Try switching to a different model (Qwen-Turbo is more reliable)
-- Ensure you're using the correct Bailian API endpoint
+## 📄 License
 
-### Fields not filling correctly
-- Some websites use custom form libraries - try manual filling
-- Check browser console for error messages
-- The field might be dynamically generated after page load
+MIT License —— 可自由使用、修改与分发。
 
-### API errors
-- Ensure your API URL is correct (default: `https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions`)
-- Check if you've exceeded your API rate limit
-- Verify the API key has proper permissions
-- Check your Alibaba Cloud account balance
+## ⚖️ 免责声明
 
-## Development
-
-### Testing Locally
-
-1. Make changes to the code
-2. Go to `chrome://extensions/`
-3. Click the reload icon on the AI Form Filler card
-4. Test the changes
-
-### Debugging
-
-- **Popup UI**: Right-click the popup → Inspect
-- **Content Script**: Right-click webpage → Inspect → Console
-- **Background Script**: Go to `chrome://extensions/` → AI Form Filler → Service Worker
-
-### Building for Production
-
-The extension is ready to use as-is. For Chrome Web Store submission:
-1. Create a ZIP file of the extension folder
-2. Submit to Chrome Web Store Developer Dashboard
-3. Follow Chrome Web Store guidelines
-
-## Future Enhancements
-
-- [ ] Support for CAPTCHA solving
-- [ ] Form field mapping templates
-- [ ] Save frequently used form data
-- [ ] Support for multi-step forms
-- [ ] Batch form filling
-- [ ] Custom field rules and patterns
-- [ ] Integration with other AI providers (Anthropic, Google, etc.)
-
-## License
-
-MIT License - Feel free to modify and distribute
-
-## Support
-
-If you encounter issues or have suggestions:
-- Check the troubleshooting section
-- Review browser console for errors
-- Ensure your API key is valid and has credits
-
-## Disclaimer
-
-This extension is designed for legitimate use cases such as:
-- Testing web applications
-- Filling registration forms for development
-- Automating repetitive data entry tasks
-
-Please use responsibly and in compliance with website terms of service.
+FormPilot 面向合法场景：Web 开发测试、QA 自动化、正当的重复性数据录入。请遵守目标网站的服务条款，勿用于绕过安全机制或提交虚假信息。

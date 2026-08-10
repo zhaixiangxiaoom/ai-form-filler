@@ -2,22 +2,42 @@
 
 let detectedForms = [];
 let isProcessing = false;
+let fillSnapshot = null; // Previous values snapshot for undo
+let fpCounter = 0; // Counter for tagging unnamed fields
 
 // Listen for messages from background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'fillForm') {
-    fillFormFields(message.formData);
+    fillFormFields(message.formData).then(report => sendResponse(report));
+    return true;
+  }
+  
+  if (message.action === 'undoFill') {
+    sendResponse(undoLastFill());
+    return true;
   }
   
   if (message.action === 'detectForms') {
     const forms = detectAllForms();
     sendResponse({ forms: forms });
+    return true;
+  }
+  
+  if (message.action === 'detectBatchRows') {
+    sendResponse({ rows: detectBatchRows(), context: getPageContext() });
+    return true;
+  }
+  
+  if (message.action === 'fillBatch') {
+    fillBatchRows(message.rowsData).then(report => sendResponse(report));
+    return true;
   }
 });
 
 // Detect all forms on the page
 function detectAllForms() {
   detectedForms = [];
+  fpCounter = 0;
   const formElements = document.querySelectorAll('form');
   
   formElements.forEach((form, formIndex) => {
@@ -29,20 +49,18 @@ function detectAllForms() {
       context: getPageContext()
     };
     
-    // Get all form fields
+    // Get all form fields (radio/checkbox with same name are merged into groups)
     const fields = form.querySelectorAll('input, select, textarea');
-    fields.forEach((field, fieldIndex) => {
-      if (shouldSkipField(field)) return;
-      
-      const fieldInfo = extractFieldInfo(field, fieldIndex);
-      formInfo.fields.push(fieldInfo);
-    });
+    collectFieldsWithGrouping(fields, formInfo.fields);
     
     // Detect rich text editors in this form
     const richTextEditors = detectRichTextEditors(form);
     richTextEditors.forEach((editor, editorIndex) => {
       formInfo.fields.push(editor);
     });
+    
+    // Detect ARIA-based custom components (Ant Design / Element Plus etc.)
+    detectCustomComponents(form).forEach(comp => formInfo.fields.push(comp));
     
     detectedForms.push(formInfo);
   });
@@ -58,16 +76,18 @@ function detectAllForms() {
       context: getPageContext()
     };
     
-    standaloneFields.forEach((field, fieldIndex) => {
-      if (shouldSkipField(field)) return;
-      const fieldInfo = extractFieldInfo(field, fieldIndex);
-      standaloneForm.fields.push(fieldInfo);
-    });
+    // Merge standalone radio/checkbox groups, then collect the rest
+    collectFieldsWithGrouping(standaloneFields, standaloneForm.fields);
     
     // Detect standalone rich text editors
     const standaloneEditors = detectRichTextEditors(document.body);
     standaloneEditors.forEach(editor => {
       standaloneForm.fields.push(editor);
+    });
+    
+    // Detect standalone custom components (outside any <form>)
+    detectCustomComponents(document.body).forEach(comp => {
+      if (!comp._inForm) standaloneForm.fields.push(comp);
     });
     
     if (standaloneForm.fields.length > 0) {
@@ -78,9 +98,92 @@ function detectAllForms() {
   return detectedForms;
 }
 
+// Collect fields, merging radio/checkbox inputs with the same name into one group entry
+function collectFieldsWithGrouping(fieldList, target) {
+  const groups = {};
+  fieldList.forEach((field, fieldIndex) => {
+    if (shouldSkipField(field)) return;
+    if ((field.type === 'radio' || field.type === 'checkbox') && field.name) {
+      if (!groups[field.name]) {
+        groups[field.name] = extractFieldInfo(field, fieldIndex);
+        groups[field.name].isGroup = true;
+        groups[field.name].options = [];
+        target.push(groups[field.name]);
+      }
+      groups[field.name].options.push({
+        value: field.value || 'on',
+        label: getFieldLabel(field)
+      });
+    } else {
+      target.push(extractFieldInfo(field, fieldIndex));
+    }
+  });
+}
+
+// Tag an element with a stable unique marker and return the marker name
+function tagElement(el) {
+  let tag = el.getAttribute('data-fp-field');
+  if (!tag) {
+    tag = 'fp_' + (fpCounter++);
+    el.setAttribute('data-fp-field', tag);
+  }
+  return tag;
+}
+
+// Detect ARIA-based custom form components (Ant Design, Element Plus, MUI, Radix...)
+function detectCustomComponents(container) {
+  const results = [];
+  const candidates = container.querySelectorAll('[role="combobox"], .ant-select-selector, .el-select');
+  const kept = [];
+  
+  candidates.forEach(el => {
+    if (el.matches('input, select, textarea')) return;
+    // Skip nested duplicates (keep the outermost kept element)
+    if (kept.some(k => k.contains(el) || el.contains(k))) return;
+    // Skip invisible components
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    kept.push(el);
+    // Mark the element so the fill phase routes it to fillCustomComponent
+    el.setAttribute('data-fp-custom', 'select');
+    
+    const innerInput = el.querySelector('input');
+    results.push({
+      name: el.id || el.getAttribute('name') || tagElement(el),
+      type: 'custom-select',
+      tagName: el.tagName.toLowerCase(),
+      label: el.getAttribute('aria-label') || getNearbyLabel(el) || '',
+      placeholder: el.getAttribute('placeholder') || (innerInput ? innerInput.placeholder : '') || '',
+      required: el.getAttribute('aria-required') === 'true',
+      value: '',
+      id: el.id || '',
+      className: typeof el.className === 'string' ? el.className : '',
+      constraints: {},
+      _inForm: !!el.closest('form')
+    });
+  });
+  
+  return results;
+}
+
+// Get label text near an element (preceding label-like sibling or parent's label)
+function getNearbyLabel(el) {
+  const wrapper = el.closest('.ant-form-item, .el-form-item, [class*="form-item"], [class*="field"]') || el.parentElement;
+  if (!wrapper) return '';
+  const labelEl = wrapper.querySelector('label, .ant-form-item-label, .el-form-item__label');
+  if (labelEl && !labelEl.contains(el)) return labelEl.textContent.trim().slice(0, 50);
+  return '';
+}
+
 // Extract information from a form field
 function extractFieldInfo(field, index) {
-  const fieldName = field.name || field.id || field.getAttribute('data-slot') || `field_${index}`;
+  let fieldName = field.name || field.id || field.getAttribute('data-slot') || '';
+  
+  // Unnamed fields: tag the DOM element with a unique marker so the fill
+  // phase can reliably find it again (fixes "field_N" never matching)
+  if (!fieldName) {
+    fieldName = tagElement(field);
+  }
   
   const fieldInfo = {
     name: fieldName,
@@ -93,6 +196,19 @@ function extractFieldInfo(field, index) {
     id: field.id || '',
     className: field.className || '',
     dataSlot: field.getAttribute('data-slot') || '',
+    // Validation constraints - used by the rule engine & AI prompt
+    constraints: {
+      pattern: field.getAttribute('pattern') || '',
+      min: field.getAttribute('min') || '',
+      max: field.getAttribute('max') || '',
+      minlength: field.getAttribute('minlength') || '',
+      maxlength: field.getAttribute('maxlength') || '',
+      step: field.getAttribute('step') || '',
+      accept: field.getAttribute('accept') || '',
+      inputmode: field.getAttribute('inputmode') || '',
+      autocomplete: field.getAttribute('autocomplete') || '',
+      multiple: !!field.multiple
+    },
     // Store unique selector for reliable filling
     selector: generateFieldSelector(field, index)
   };
@@ -105,10 +221,9 @@ function extractFieldInfo(field, index) {
     }));
   }
   
-  // Get options for radio/checkbox groups
-  if (field.type === 'radio' || field.type === 'checkbox') {
-    fieldInfo.options = [field.value || 'on'];
-    fieldInfo.checked = field.checked;
+  // Single checkbox without a group name: boolean field
+  if (field.type === 'checkbox' && !field.name) {
+    fieldInfo.options = ['true'];
   }
   
   return fieldInfo;
@@ -137,27 +252,47 @@ function generateFieldSelector(field, index) {
 
 // Get label text for a field
 function getFieldLabel(field) {
-  // Try to find associated label
+  // 1. Associated label via for attribute
   if (field.id) {
     const label = document.querySelector(`label[for="${field.id}"]`);
-    if (label) return label.textContent.trim();
+    if (label && label.textContent.trim()) return label.textContent.trim();
   }
   
-  // Try to find parent label
+  // 2. Parent label wrapper
   const parentLabel = field.closest('label');
-  if (parentLabel) {
+  if (parentLabel && parentLabel.textContent.trim()) {
     return parentLabel.textContent.trim();
   }
   
-  // Try aria-label
+  // 3. ARIA attributes
   if (field.getAttribute('aria-label')) {
     return field.getAttribute('aria-label');
   }
+  const labelledBy = field.getAttribute('aria-labelledby');
+  if (labelledBy) {
+    const ref = document.getElementById(labelledBy.split(/\s+/)[0]);
+    if (ref && ref.textContent.trim()) return ref.textContent.trim();
+  }
   
-  // Try to find preceding text
+  // 4. Label-like text in the nearest wrapper that contains exactly one control
+  //    (covers Ant Design / Element Plus / custom div-based layouts)
+  let node = field.parentElement;
+  for (let depth = 0; node && depth < 3; depth++) {
+    const controls = node.querySelectorAll('input, select, textarea, [role="combobox"]');
+    if (controls.length === 1) {
+      const labelEl = node.querySelector('label, legend, dt, .label, [class*="label"], .ant-form-item-label, .el-form-item__label');
+      if (labelEl && !labelEl.contains(field) && labelEl.textContent.trim()) {
+        return labelEl.textContent.trim().slice(0, 60);
+      }
+    }
+    node = node.parentElement;
+  }
+  
+  // 5. Preceding sibling text
   const prevElement = field.previousElementSibling;
-  if (prevElement && (prevElement.tagName.toLowerCase() === 'label' || prevElement.classList.contains('label'))) {
-    return prevElement.textContent.trim();
+  if (prevElement) {
+    const text = prevElement.textContent.trim();
+    if (text && text.length <= 60) return text;
   }
   
   return '';
@@ -419,19 +554,22 @@ function getPageContext() {
   };
 }
 
-// Fill form fields with generated data
-function fillFormFields(formData) {
-  console.log('[AI Form Filler] Starting to fill fields:', Object.keys(formData).length, 'fields');
+// Fill form fields with generated data, returns a fill report
+async function fillFormFields(formData) {
+  console.log('[FormPilot] Starting to fill fields:', Object.keys(formData).length, 'fields');
   
   isProcessing = true;
   let filledCount = 0;
+  const notFound = [];
+  const snapshot = [];
+  const filledElements = [];
   
   // Get all form fields on the page with their detection indices
   const allFields = getAllFieldsWithIndices();
   
-  Object.keys(formData).forEach(fieldName => {
+  for (const fieldName of Object.keys(formData)) {
     const value = formData[fieldName];
-    console.log(`[AI Form Filler] Processing: ${fieldName} (${typeof value})`);
+    console.log(`[FormPilot] Processing: ${fieldName} (${typeof value})`);
     
     // Strategy 1: Try to find by exact name/id match
     let fields = findFieldsByName(fieldName);
@@ -441,7 +579,7 @@ function fillFormFields(formData) {
       const indexMatch = fieldName.match(/^(\w+)_(\d+)$/);
       if (indexMatch) {
         const [, tagName, index] = indexMatch;
-        console.log(`[AI Form Filler] Trying index-based match: ${tagName}[${index}]`);
+        console.log(`[FormPilot] Trying index-based match: ${tagName}[${index}]`);
         const matchedFieldObj = findFieldByTagAndIndex(tagName, parseInt(index), allFields);
         if (matchedFieldObj) {
           // Use the actual element from the field object
@@ -462,29 +600,215 @@ function fillFormFields(formData) {
     
     // Strategy 3: Try placeholder/label match
     if (fields.length === 0) {
-      console.log(`[AI Form Filler] Trying placeholder/label match for: ${fieldName}`);
+      console.log(`[FormPilot] Trying placeholder/label match for: ${fieldName}`);
       const matched = findFieldByLabelOrPlaceholder(fieldName, value);
       if (matched) fields = [matched];
     }
     
     // Fill the found field(s)
     if (fields.length > 0) {
-      fields.forEach(field => {
-        if (fillField(field, value)) {
+      for (const field of fields) {
+        // Snapshot previous value for undo
+        snapshot.push(captureFieldValue(field));
+        if (await fillField(field, value)) {
           filledCount++;
-          console.log(`[AI Form Filler] ✅ Filled: ${fieldName}`);
+          filledElements.push(field);
+          console.log(`[FormPilot] ✅ Filled: ${fieldName}`);
         }
-      });
+      }
     } else {
-      console.log(`[AI Form Filler] ❌ Not found: ${fieldName}`);
+      notFound.push(fieldName);
+      console.log(`[FormPilot] ❌ Not found: ${fieldName}`);
+    }
+  }
+  
+  dispatchFormEvents();
+  
+  // Keep snapshot for undo
+  fillSnapshot = snapshot.length > 0 ? snapshot : null;
+  
+  // Post-fill validation report
+  const invalidFields = validateFilledFields(filledElements);
+  
+  console.log(`[FormPilot] Completed! Filled ${filledCount}/${Object.keys(formData).length} fields`);
+  isProcessing = false;
+  
+  const report = {
+    filledCount,
+    totalKeys: Object.keys(formData).length,
+    notFound,
+    invalidFields,
+    canUndo: !!fillSnapshot
+  };
+  
+  if (invalidFields.length > 0) {
+    showNotification(`Filled ${filledCount} fields, ${invalidFields.length} failed validation`, 'info');
+  } else {
+    showNotification(`Successfully filled ${filledCount} fields!`, 'success');
+  }
+  
+  // Watch for multi-step form changes (new fields appearing after step switch)
+  startStepWatcher();
+  
+  return report;
+}
+
+// ==================== P3: batch rows (repeated table rows / sibling blocks) ====================
+
+const BATCH_CONTROL_SEL = 'input:not([type="hidden"]):not([type="submit"]):not([type="button"]), select, textarea';
+
+// Detect repeating row containers suitable for per-row batch filling
+function detectBatchRows() {
+  const candidates = [];
+  const pushed = new Set();
+  const push = (el) => { if (!pushed.has(el)) { pushed.add(el); candidates.push(el); } };
+
+  // 1) Table rows containing controls (>=2 rows per table)
+  document.querySelectorAll('table').forEach(table => {
+    const trs = Array.from(table.querySelectorAll('tr')).filter(tr => tr.querySelector(BATCH_CONTROL_SEL));
+    if (trs.length >= 2) trs.forEach(push);
+  });
+
+  // 2) Repeated sibling blocks with the same tag+class signature (non-table layouts)
+  document.querySelectorAll('div, ul, section').forEach(container => {
+    if (container.closest('table') || container.querySelector('table')) return;
+    const kids = Array.from(container.children).filter(k => k.querySelector(BATCH_CONTROL_SEL));
+    if (kids.length < 2) return;
+    const sig = (k) => k.tagName + '|' + String(k.className).split(/\s+/).slice(0, 3).join('.');
+    const counts = {};
+    kids.forEach(k => { counts[sig(k)] = (counts[sig(k)] || 0) + 1; });
+    kids.forEach(k => { if (counts[sig(k)] >= 2) push(k); });
+  });
+
+  // Drop rows that nest other rows (avoid double-filling outer+inner)
+  const rowEls = candidates.filter(el => !candidates.some(other => other !== el && el.contains(other)));
+  if (rowEls.length < 2) return [];
+
+  return rowEls.map((el, i) => {
+    el.setAttribute('data-fp-row', 'r_' + i);
+    const fields = [];
+    collectFieldsWithGrouping(el.querySelectorAll('input, select, textarea'), fields);
+    return { rowId: 'r_' + i, fields };
+  });
+}
+
+// Fill each row with its own dataset, scoped to the row element
+async function fillBatchRows(rowsData) {
+  isProcessing = true;
+  const snapshot = [];
+  const filledElements = [];
+  const notFound = [];
+  let filledCount = 0;
+  let totalKeys = 0;
+
+  for (let i = 0; i < rowsData.length; i++) {
+    const rowEl = document.querySelector(`[data-fp-row="r_${i}"]`);
+    const data = rowsData[i] || {};
+    if (!rowEl) {
+      Object.keys(data).forEach(n => { totalKeys++; notFound.push(`row${i}:${n}`); });
+      continue;
+    }
+    for (const name of Object.keys(data)) {
+      totalKeys++;
+      const safe = attrEscape(name);
+      let els = Array.from(rowEl.querySelectorAll(`[name="${safe}"]`));
+      if (els.length === 0) els = Array.from(rowEl.querySelectorAll(`[data-fp-field="${safe}"]`));
+      if (els.length === 0) { notFound.push(name); continue; }
+      for (const field of els) {
+        snapshot.push(captureFieldValue(field));
+        if (await fillField(field, data[name])) {
+          filledCount++;
+          filledElements.push(field);
+        }
+      }
+    }
+  }
+
+  dispatchFormEvents();
+  fillSnapshot = snapshot.length > 0 ? snapshot : null;
+  const invalidFields = validateFilledFields(filledElements);
+  isProcessing = false;
+  showNotification(`Batch filled ${filledCount} fields across ${rowsData.length} rows`, 'success');
+  startStepWatcher();
+  return {
+    filledCount,
+    totalKeys,
+    notFound,
+    invalidFields,
+    canUndo: !!fillSnapshot,
+    rowCount: rowsData.length
+  };
+}
+
+function attrEscape(s) {
+  return String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+// Capture current value of a field for undo
+function captureFieldValue(field) {
+  // Custom components have no reliable snapshot - skip them on undo
+  if (field.getAttribute && field.getAttribute('data-fp-custom')) {
+    return { field, kind: 'custom', value: '' };
+  }
+  const isRichText = field.type && String(field.type).startsWith('richtext');
+  if (isRichText || field.isContentEditable) {
+    return { field, kind: 'html', value: field.innerHTML || '' };
+  }
+  if (field.type === 'checkbox' || field.type === 'radio') {
+    return { field, kind: 'checked', value: field.checked };
+  }
+  return { field, kind: 'value', value: field.value };
+}
+
+// Restore values from the last fill snapshot
+function undoLastFill() {
+  if (!fillSnapshot) {
+    return { success: false, error: 'Nothing to undo' };
+  }
+  
+  let restored = 0;
+  fillSnapshot.forEach(({ field, kind, value }) => {
+    if (kind === 'custom') return; // Custom components cannot be restored
+    try {
+      if (kind === 'html') {
+        field.innerHTML = value;
+      } else if (kind === 'checked') {
+        field.checked = value;
+      } else {
+        field.value = value;
+      }
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+      field.dispatchEvent(new Event('change', { bubbles: true }));
+      restored++;
+    } catch (e) {
+      console.warn('[FormPilot] Undo failed for a field:', e);
     }
   });
   
   dispatchFormEvents();
-  console.log(`[AI Form Filler] Completed! Filled ${filledCount}/${Object.keys(formData).length} fields`);
-  isProcessing = false;
-  
-  showNotification(`Successfully filled ${filledCount} fields!`, 'success');
+  fillSnapshot = null;
+  showNotification(`Restored ${restored} fields`, 'success');
+  return { success: true, restoredCount: restored };
+}
+
+// Check HTML5 validity of filled fields and collect error messages
+function validateFilledFields(elements) {
+  const invalid = [];
+  elements.forEach(field => {
+    try {
+      if (typeof field.checkValidity === 'function' && !field.checkValidity()) {
+        invalid.push({
+          name: field.name || field.id || getFieldLabel(field) || '(unknown)',
+          label: getFieldLabel(field),
+          message: field.validationMessage || 'Invalid value',
+          value: field.type === 'checkbox' || field.type === 'radio' ? field.checked : field.value
+        });
+      }
+    } catch (e) {
+      // Rich text / contenteditable elements have no checkValidity - skip
+    }
+  });
+  return invalid;
 }
 
 // Get all form fields with their detection indices
@@ -604,6 +928,14 @@ function findFieldsByName(name) {
     });
   }
   
+  // Search by FormPilot marker (unnamed fields tagged during detection)
+  if (fields.length === 0) {
+    const byFpTag = document.querySelectorAll(`[data-fp-field="${name}"]`);
+    byFpTag.forEach(f => {
+      if (!fields.includes(f)) fields.push(f);
+    });
+  }
+  
   // Search by placeholder text (fallback)
   if (fields.length === 0) {
     const allTextareas = document.querySelectorAll('textarea');
@@ -646,12 +978,17 @@ function findFieldByLabelOrPlaceholder(fieldName, value) {
 }
 
 // Fill a single field with value
-function fillField(field, value) {
-  if (!value && value !== '') return false;
+async function fillField(field, value) {
+  if (!value && value !== '' && value !== false) return false;
   
   try {
     const tagName = field.tagName.toLowerCase();
     const type = field.type;
+    
+    // Handle ARIA custom components (Ant Design / Element Plus selects etc.)
+    if (field.getAttribute && field.getAttribute('data-fp-custom') === 'select') {
+      return await fillCustomComponent(field, value);
+    }
     
     // Handle rich text editors
     if (type && type.startsWith('richtext')) {
@@ -807,6 +1144,114 @@ function fillCheckboxField(field, value) {
   return true;
 }
 
+// ==================== ARIA custom component filling ====================
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function fireMouse(el, type) {
+  el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
+}
+
+// Fill a custom select-like component: open dropdown, click matching option
+async function fillCustomComponent(field, value) {
+  try {
+    const trigger = field.querySelector('.ant-select-selector') || field;
+    fireMouse(trigger, 'mousedown');
+    fireMouse(trigger, 'mouseup');
+    fireMouse(trigger, 'click');
+    if (typeof trigger.focus === 'function') trigger.focus();
+    await sleep(350);
+    
+    // Collect visible dropdown options (rendered in body-level popups)
+    const optionSelector = '[role="option"], .ant-select-item-option, .el-select-dropdown__item, li[class*="option"]';
+    const visibleOptions = () => Array.from(document.querySelectorAll(optionSelector))
+      .filter(o => o.offsetParent !== null && o.textContent.trim());
+    
+    const target = String(value).trim().toLowerCase();
+    let options = visibleOptions();
+    let match = options.find(o => o.textContent.trim().toLowerCase() === target)
+      || options.find(o => o.textContent.trim().toLowerCase().includes(target))
+      || options.find(o => target.includes(o.textContent.trim().toLowerCase()));
+    
+    // Fallback: searchable combobox - type into the search input
+    if (!match) {
+      const searchInput = field.querySelector('input') ||
+        (document.activeElement && document.activeElement.tagName === 'INPUT' ? document.activeElement : null);
+      if (searchInput) {
+        searchInput.value = String(value);
+        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        await sleep(400);
+        options = visibleOptions();
+        match = options.find(o => o.textContent.trim().toLowerCase().includes(target)) || options[0];
+      }
+    }
+    
+    if (match) {
+      fireMouse(match, 'mousedown');
+      fireMouse(match, 'mouseup');
+      fireMouse(match, 'click');
+      await sleep(150);
+      return true;
+    }
+    
+    // No matching option: close the dropdown
+    document.body.click();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    console.log('[FormPilot] ❌ Custom component: no matching option for', value);
+    return false;
+  } catch (error) {
+    console.error('[FormPilot] Custom component fill error:', error);
+    return false;
+  }
+}
+
+// ==================== Multi-step form watcher ====================
+
+let stepObserver = null;
+let knownFieldCount = 0;
+
+// Count currently visible fillable fields
+function countVisibleFormFields() {
+  let count = 0;
+  document.querySelectorAll('input, select, textarea, [role="combobox"]').forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    if (el.disabled || el.readOnly) return;
+    count++;
+  });
+  return count;
+}
+
+// After a fill, watch the DOM for new fields appearing (multi-step forms)
+function startStepWatcher() {
+  knownFieldCount = countVisibleFormFields();
+  if (stepObserver) stepObserver.disconnect();
+  
+  let timer = null;
+  stepObserver = new MutationObserver(() => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      const now = countVisibleFormFields();
+      if (now > knownFieldCount) {
+        console.log(`[FormPilot] 📄 Form step changed: ${knownFieldCount} -> ${now} fields`);
+        knownFieldCount = now;
+        try {
+          chrome.runtime.sendMessage({
+            action: 'formStepChanged',
+            previousCount: knownFieldCount,
+            currentCount: now
+          }).catch(() => {});
+        } catch (e) {
+          // Extension context may be invalidated after update - ignore
+        }
+      }
+    }, 800);
+  });
+  stepObserver.observe(document.body, { childList: true, subtree: true });
+}
+
 // Dispatch events to trigger validation and other listeners
 function dispatchFormEvents() {
   const forms = document.querySelectorAll('form');
@@ -864,6 +1309,6 @@ document.head.appendChild(style);
 setTimeout(() => {
   const forms = detectAllForms();
   if (forms.length > 0) {
-    console.log(`AI Form Filler: Detected ${forms.length} form(s) on page`);
+    console.log(`FormPilot: Detected ${forms.length} form(s) on page`);
   }
 }, 1000);

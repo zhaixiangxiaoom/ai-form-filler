@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Form Filler</title>
+  <title>FormPilot</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <div class="container">
     <header>
-      <h1>🤖 AI Form Filler</h1>
-      <p class="subtitle">Auto-fill forms with AI-generated data</p>
+      <h1>✈️ FormPilot</h1>
+      <p class="subtitle">AI 智能填表助手 · 一键填充表单</p>
     </header>
 
     <div class="tabs">
@@ -34,12 +34,22 @@
       </div>
 
       <div class="actions">
-        <button id="detect-btn" class="btn btn-primary">
-          🔍 Detect Forms
+        <button id="smart-btn" class="btn btn-success">
+          ⚡ 一键智能填充
         </button>
-        <button id="fill-btn" class="btn btn-success" disabled>
-          ✨ Generate & Fill
+        <button id="detect-btn" class="btn btn-secondary">
+          🔍 仅预览字段
         </button>
+      </div>
+      <div class="actions">
+        <button id="undo-btn" class="btn btn-secondary" style="display: none;">
+          ↩️ 撤销上次填充
+        </button>
+      </div>
+
+      <div id="report-section" class="report-section" style="display: none;">
+        <h3>📋 填充报告</h3>
+        <div id="report-content"></div>
       </div>
 
       <div id="preview-section" class="preview-section" style="display: none;">
@@ -97,7 +107,7 @@
     </div>
 
     <footer>
-      <p class="footer-text">AI Form Filler v1.0.0</p>
+      <p class="footer-text">FormPilot v1.1.0</p>
     </footer>
   </div>
 

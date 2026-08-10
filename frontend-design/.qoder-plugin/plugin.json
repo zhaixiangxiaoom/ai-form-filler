@@ -1,0 +1,15 @@
+{
+  "name": "frontend-design",
+  "displayName": "Frontend Design",
+  "version": "0.1.0",
+  "description": "Guidance for distinctive, intentional visual design when building new UI or reshaping an existing one.",
+  "descriptionZh": "在构建新 UI 或改造现有 UI 时提供独具特色、意图明确的视觉设计指导。",
+  "author": { "name": "Anthropics" },
+  "homepage": "https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md",
+  "repository": "https://github.com/anthropics/skills",
+  "logo": "./assets/avatar.svg",
+  "keywords": ["qoder-plugin", "skill", "frontend", "design", "ui"],
+  "category": "developer-tools",
+  "tags": ["skill", "frontend", "design"],
+  "skills": "./skills/"
+}

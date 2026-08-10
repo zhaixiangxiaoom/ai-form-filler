@@ -1,11 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "AI Form Filler",
-  "version": "1.0.0",
-  "description": "Automatically detect and fill form fields using AI-generated data",
+  "name": "FormPilot - AI 智能填表助手",
+  "version": "1.4.0",
+  "description": "智能识别网页表单，AI 自动填充符合页面要求的内容，让填表一键完成",
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "sidePanel",
+    "contextMenus"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -20,8 +22,19 @@
       "run_at": "document_idle"
     }
   ],
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "commands": {
+    "smart-fill": {
+      "suggested_key": {
+        "default": "Alt+Shift+F",
+        "mac": "Alt+Shift+F"
+      },
+      "description": "FormPilot 一键智能填充"
+    }
+  },
   "action": {
-    "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",

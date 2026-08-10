@@ -3,7 +3,7 @@
  * 打开 test-richtext.html，然后在控制台粘贴此代码
  */
 
-console.log('=== AI Form Filler Debug Script ===\n');
+console.log('=== FormPilot Debug Script ===\n');
 
 // 1. 检查 Quill 编辑器
 console.log('1. Checking Quill Editor:');

@@ -1,4 +1,4 @@
-# AI Form Filler - Chrome Extension Project Overview
+# FormPilot - Chrome Extension Project Overview
 
 ## 🎯 Project Summary
 
@@ -338,7 +338,7 @@ This is a complete, production-ready extension. Feel free to:
 
 ## 🎉 Conclusion
 
-AI Form Filler is a powerful, privacy-focused Chrome extension that leverages AI to automate form filling. It uses Alibaba Cloud's Bailian Qwen models to generate realistic form data and is designed for developers, QA testers, and anyone who needs to fill forms efficiently.
+FormPilot is a powerful, privacy-focused Chrome extension that leverages AI to automate form filling. It uses Alibaba Cloud's Bailian Qwen models to generate realistic form data and is designed for developers, QA testers, and anyone who needs to fill forms efficiently.
 
 **Ready to use right out of the box!**
 

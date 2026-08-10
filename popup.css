@@ -190,6 +190,84 @@ header h1 {
   box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
 }
 
+.btn-secondary {
+  background: #f0f2f5;
+  color: #555;
+  border: 1px solid #d9d9d9;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #e4e7eb;
+  color: #333;
+}
+
+/* Fill Report */
+.report-section {
+  margin-top: 15px;
+  padding: 15px;
+  background: #fafafa;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.report-section h3 {
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.report-summary {
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.report-summary.ok {
+  background: #e8f5e9;
+  color: #388e3c;
+}
+
+.report-summary.warn {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.report-group-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  margin: 10px 0 6px;
+}
+
+.report-item {
+  background: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+  border-left: 4px solid #ccc;
+  margin-bottom: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.report-item.invalid {
+  border-left-color: #d32f2f;
+}
+
+.report-item.muted {
+  color: #888;
+}
+
+.report-field-name {
+  font-weight: 600;
+  color: #333;
+}
+
+.report-field-msg {
+  color: #d32f2f;
+}
+
 /* Preview Section */
 .preview-section {
   margin-top: 20px;
