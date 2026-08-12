@@ -27,12 +27,15 @@ chrome.runtime.onInstalled.addListener(() => {
     chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
   }
   
-  // Context menu entry
+  // Context menu entry (removeAll first: on reload/update the stale item
+  // survives and create() would fail with "duplicate id")
   if (chrome.contextMenus && chrome.contextMenus.create) {
-    chrome.contextMenus.create({
-      id: 'formpilot-smart-fill',
-      title: '⚡ FormPilot 智能填充',
-      contexts: ['page']
+    chrome.contextMenus.removeAll(() => {
+      chrome.contextMenus.create({
+        id: 'formpilot-smart-fill',
+        title: '⚡ FormPilot 智能填充',
+        contexts: ['page']
+      }, () => void chrome.runtime.lastError); // swallow expected errors
     });
   }
 });
