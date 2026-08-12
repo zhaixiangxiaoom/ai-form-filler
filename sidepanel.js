@@ -57,6 +57,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Tabs
   document.getElementById('tab-fill').addEventListener('click', () => switchTab('fill'));
   document.getElementById('tab-assets').addEventListener('click', () => switchTab('assets'));
+  document.getElementById('tab-settings').addEventListener('click', () => switchTab('settings'));
+  document.getElementById('settings-save').addEventListener('click', saveSettings);
 
   // Template saving & correction learning
   document.getElementById('save-template-btn').addEventListener('click', saveTemplate);
@@ -448,9 +450,12 @@ function hideStepBanner() {
 function switchTab(name) {
   document.getElementById('tab-fill').classList.toggle('active', name === 'fill');
   document.getElementById('tab-assets').classList.toggle('active', name === 'assets');
+  document.getElementById('tab-settings').classList.toggle('active', name === 'settings');
   document.getElementById('fill-tab').classList.toggle('active', name === 'fill');
   document.getElementById('assets-tab').classList.toggle('active', name === 'assets');
+  document.getElementById('settings-tab').classList.toggle('active', name === 'settings');
   if (name === 'assets') loadAssetsUI();
+  if (name === 'settings') loadSettingsUI();
 }
 
 // Show a banner when the current site has a saved template
@@ -837,6 +842,50 @@ async function importShareCode() {
   } catch (error) {
     showStatus('❌ 分享码无效，请检查是否复制完整', 'error');
   }
+}
+
+// ==================== Settings: LLM config ====================
+
+function loadSettingsUI() {
+  chrome.runtime.sendMessage({ action: 'getConfig' }, (config) => {
+    const c = config || {};
+    document.getElementById('set-api-key').value = c.apiKey || '';
+    document.getElementById('set-api-url').value = c.apiUrl || 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
+    const modelSel = document.getElementById('set-model');
+    if (c.model && !Array.from(modelSel.options).some(o => o.value === c.model)) {
+      const opt = document.createElement('option');
+      opt.value = c.model;
+      opt.textContent = c.model + '（自定义）';
+      modelSel.appendChild(opt);
+    }
+    modelSel.value = c.model || 'qwen-plus';
+    document.getElementById('set-language').value = c.language || 'zh';
+    document.getElementById('set-autofill').value = c.autoFill ? '1' : '0';
+  });
+}
+
+function saveSettings() {
+  const btn = document.getElementById('settings-save');
+  const flash = (text) => {
+    btn.textContent = text;
+    setTimeout(() => { btn.textContent = '保存设置'; }, 1600);
+  };
+  const apiKey = document.getElementById('set-api-key').value.trim();
+  if (!apiKey) {
+    flash('⚠️ 请先填写 API Key');
+    document.getElementById('set-api-key').focus();
+    return;
+  }
+  const config = {
+    apiKey,
+    apiUrl: document.getElementById('set-api-url').value.trim() || 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
+    model: document.getElementById('set-model').value,
+    language: document.getElementById('set-language').value,
+    autoFill: document.getElementById('set-autofill').value === '1'
+  };
+  chrome.runtime.sendMessage({ action: 'updateConfig', config }, () => {
+    flash('✅ 已保存');
+  });
 }
 
 // ==================== Utils ====================

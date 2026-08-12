@@ -21,6 +21,7 @@
     <div class="tabs">
       <button id="tab-fill" class="tab-btn active">✍️ 填充助手</button>
       <button id="tab-assets" class="tab-btn">💾 数据资产</button>
+      <button id="tab-settings" class="tab-btn">⚙️ 设置</button>
     </div>
 
     <!-- ============ Tab 1: fill assistant ============ -->
@@ -155,6 +156,38 @@
         </div>
       </section>
 
+    </div>
+
+    <!-- ============ Tab 3: settings ============ -->
+    <div id="settings-tab" class="tab-content">
+      <section class="asset-section">
+        <div class="asset-header">
+          <h3>🔑 大模型 API</h3>
+        </div>
+        <p class="asset-hint">AI 仅用于生成开放型字段（自我介绍、描述、长文等）；邮箱/电话/日期等结构化字段由本地规则引擎生成，不消耗额度。Key 仅存于本机浏览器。</p>
+        <div class="asset-form">
+          <input id="set-api-key" type="password" placeholder="阿里云百炼 API Key（sk-...）" autocomplete="off">
+          <select id="set-model">
+            <option value="qwen-plus">qwen-plus（均衡推荐）</option>
+            <option value="qwen-turbo">qwen-turbo（更快更省）</option>
+            <option value="qwen-max">qwen-max（最强效果）</option>
+          </select>
+          <input id="set-api-url" placeholder="API URL（使用其他兼容服务时修改）">
+          <div class="rule-row">
+            <select id="set-language">
+              <option value="zh">生成中文内容</option>
+              <option value="en">生成英文内容</option>
+            </select>
+            <select id="set-autofill">
+              <option value="0">先预览再填充</option>
+              <option value="1">检测后自动填充</option>
+            </select>
+          </div>
+          <div class="asset-form-actions">
+            <button id="settings-save" class="btn-mini primary">保存设置</button>
+          </div>
+        </div>
+      </section>
     </div>
 
     <footer>
