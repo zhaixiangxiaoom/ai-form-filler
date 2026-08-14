@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- FormPilot mark, mono variant: inherits currentColor, inner details knocked out -->
+  <mask id="m">
+    <rect width="512" height="512" fill="#fff"/>
+    <g transform="rotate(38 256 256)" fill="none" stroke="#000" stroke-width="40" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M262 196l34 34 70-78"/>
+      <path d="M210 330h110"/>
+      <path d="M210 392h76"/>
+    </g>
+  </mask>
+  <g mask="url(#m)">
+    <rect x="88" y="76" width="250" height="310" rx="60" fill="currentColor" opacity=".45"/>
+    <g transform="rotate(38 256 256)">
+      <rect x="146" y="88" width="250" height="340" rx="64" fill="currentColor"/>
+    </g>
+    <g fill="none" stroke="currentColor" stroke-width="34" stroke-linecap="round">
+      <path d="M84 400l66 52"/>
+      <path d="M60 448l58 46"/>
+    </g>
+  </g>
+</svg>

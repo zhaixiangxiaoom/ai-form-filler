@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- FormPilot mark: flying form card — lines + check contained, speed lines behind -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#0A66FF"/>
+      <stop offset="1" stop-color="#22D3EE"/>
+    </linearGradient>
+  </defs>
+  <!-- back card -->
+  <rect x="88" y="76" width="250" height="310" rx="60" fill="#A5DCFF"/>
+  <!-- front flying card -->
+  <g transform="rotate(38 256 256)">
+    <rect x="146" y="88" width="250" height="340" rx="64" fill="url(#g)"/>
+    <g fill="none" stroke="#FFFFFF" stroke-width="40" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M262 196l34 34 70-78"/>
+      <path d="M210 330h110"/>
+      <path d="M210 392h76"/>
+    </g>
+  </g>
+  <!-- speed lines -->
+  <g fill="none" stroke="url(#g)" stroke-width="34" stroke-linecap="round">
+    <path d="M84 400l66 52"/>
+    <path d="M60 448l58 46"/>
+  </g>
+</svg>
